@@ -1,6 +1,7 @@
 package com.ibizabroker.bibliotheque.service;
 
 import com.ibizabroker.bibliotheque.dao.BooksRepository;
+import com.ibizabroker.bibliotheque.dao.BorrowRepository;
 import com.ibizabroker.bibliotheque.dao.ReservationRepository;
 import com.ibizabroker.bibliotheque.dao.UsersRepository;
 import com.ibizabroker.bibliotheque.dto.ReservationRequest;
@@ -39,6 +40,9 @@ public class ReservationService {
     @Autowired
     private UsersRepository usersRepository;
 
+    @Autowired
+    private BorrowRepository borrowRepository;
+
     @Transactional
     public ReservationResponse create(ReservationRequest request) {
         Books livre = booksRepository.findByIdForUpdate(request.getLivreId())
@@ -50,7 +54,12 @@ public class ReservationService {
                         "Adhérent avec l'identifiant " + request.getAdherentId() + " introuvable."
                 ));
 
-        if (livre.getNoOfCopies() != null && livre.getNoOfCopies() > 0) {
+        // RG-01 : un livre n'est réservable que s'il possède un emprunt en cours.
+        // Dans le modèle actuel, returnDate == null représente un emprunt non rendu.
+        boolean empruntActif = borrowRepository
+                .existsByBookIdAndReturnDateIsNull(livre.getBookId());
+
+        if (!empruntActif) {
             throw new BusinessRuleException(
                     "RG-01 : le livre doit être indisponible pour être réservé."
             );
