@@ -1,7 +1,6 @@
 package com.ibizabroker.bibliotheque.service;
 
 import com.ibizabroker.bibliotheque.dao.BooksRepository;
-import com.ibizabroker.bibliotheque.dao.BorrowRepository;
 import com.ibizabroker.bibliotheque.dao.ReservationRepository;
 import com.ibizabroker.bibliotheque.dao.UsersRepository;
 import com.ibizabroker.bibliotheque.dto.ReservationRequest;
@@ -40,9 +39,6 @@ public class ReservationService {
     @Autowired
     private UsersRepository usersRepository;
 
-    @Autowired
-    private BorrowRepository borrowRepository;
-
     @Transactional
     public ReservationResponse create(ReservationRequest request) {
         Books livre = booksRepository.findByIdForUpdate(request.getLivreId())
@@ -54,12 +50,10 @@ public class ReservationService {
                         "Adhérent avec l'identifiant " + request.getAdherentId() + " introuvable."
                 ));
 
-        // RG-01 : un livre n'est réservable que s'il possède un emprunt en cours.
-        // Dans le modèle actuel, returnDate == null représente un emprunt non rendu.
-        boolean empruntActif = borrowRepository
-                .existsByBookIdAndReturnDateIsNull(livre.getBookId());
-
-        if (!empruntActif) {
+        // RG-01 : noOfCopies reflète le nombre d'exemplaires actuellement disponibles
+        // (décrémenté/incrémenté par le module Borrow). Un livre n'est réservable
+        // que s'il n'en reste aucun disponible, quel que soit le nombre total d'exemplaires.
+        if (livre.getNoOfCopies() != null && livre.getNoOfCopies() > 0) {
             throw new BusinessRuleException(
                     "RG-01 : le livre doit être indisponible pour être réservé."
             );
@@ -73,9 +67,12 @@ public class ReservationService {
             );
         }
 
-        if (reservationRepository.countByAdherentUserIdAndStatutIn(
-                adherent.getUserId(), ACTIVE_STATUSES
-        ) >= 3) {
+        // RG-03 : les réservations actives de l'adhérent sont verrouillées avant d'être
+        // comptées, pour empêcher deux créations concurrentes de dépasser la limite de 3.
+        List<Reservation> reservationsActives = reservationRepository
+                .findActiveByAdherentForUpdate(adherent.getUserId(), ACTIVE_STATUSES);
+
+        if (reservationsActives.size() >= 3) {
             throw new BusinessRuleException(
                     "RG-03 : l'adhérent ne peut pas dépasser 3 réservations actives simultanées."
             );

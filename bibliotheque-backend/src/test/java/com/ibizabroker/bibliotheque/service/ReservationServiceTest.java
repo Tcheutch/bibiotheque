@@ -1,7 +1,6 @@
 package com.ibizabroker.bibliotheque.service;
 
 import com.ibizabroker.bibliotheque.dao.BooksRepository;
-import com.ibizabroker.bibliotheque.dao.BorrowRepository;
 import com.ibizabroker.bibliotheque.dao.ReservationRepository;
 import com.ibizabroker.bibliotheque.dao.UsersRepository;
 import com.ibizabroker.bibliotheque.dto.ReservationRequest;
@@ -22,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,20 +40,18 @@ class ReservationServiceTest {
     @Mock private ReservationRepository reservationRepository;
     @Mock private BooksRepository booksRepository;
     @Mock private UsersRepository usersRepository;
-    @Mock private BorrowRepository borrowRepository;
 
     @InjectMocks
     private ReservationService reservationService;
 
     @Test
-    void rg01ShouldRejectBookWithoutActiveBorrow() {
+    void rg01ShouldRejectBookWithAvailableCopies() {
         ReservationRequest request = request(10, 4);
         Books livre = book(10, 1);
         Users adherent = user(4);
 
         when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
         when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
-        when(borrowRepository.existsByBookIdAndReturnDateIsNull(10)).thenReturn(false);
 
         BusinessRuleException exception = assertThrows(
                 BusinessRuleException.class,
@@ -64,6 +63,52 @@ class ReservationServiceTest {
     }
 
     @Test
+    void rg01ShouldRejectMultiCopyBookWithAtLeastOneCopyStillAvailable() {
+        ReservationRequest request = request(10, 4);
+        // 3 exemplaires au total, 1 emprunté (noOfCopies décrémenté par le module Borrow) :
+        // il en reste 2 disponibles, donc le livre n'est pas réservable.
+        Books livre = book(10, 2);
+        Users adherent = user(4);
+
+        when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
+        when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
+
+        BusinessRuleException exception = assertThrows(
+                BusinessRuleException.class,
+                () -> reservationService.create(request)
+        );
+
+        assertTrue(exception.getMessage().contains("RG-01"));
+        verify(reservationRepository, never()).save(any(Reservation.class));
+    }
+
+    @Test
+    void rg01ShouldAllowReservationWhenMultiCopyBookHasNoCopyLeft() {
+        ReservationRequest request = request(10, 4);
+        // Dernier exemplaire emprunté : plus aucune copie disponible, réservable.
+        Books livre = book(10, 0);
+        Users adherent = user(4);
+
+        when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
+        when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
+        when(reservationRepository.existsByLivreBookIdAndAdherentUserIdAndStatutIn(
+                eq(10), eq(4), any(Collection.class)
+        )).thenReturn(false);
+        when(reservationRepository.findActiveByAdherentForUpdate(
+                eq(4), any(Collection.class)
+        )).thenReturn(Collections.emptyList());
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation reservation = invocation.getArgument(0);
+            reservation.setId(1);
+            return reservation;
+        });
+
+        ReservationResponse response = reservationService.create(request);
+
+        assertEquals(ReservationStatus.EN_ATTENTE, response.getStatut());
+    }
+
+    @Test
     void rg02ShouldRejectDuplicateActiveReservationForSameBookAndUser() {
         ReservationRequest request = request(10, 4);
         Books livre = book(10, 0);
@@ -71,7 +116,6 @@ class ReservationServiceTest {
 
         when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
         when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
-        when(borrowRepository.existsByBookIdAndReturnDateIsNull(10)).thenReturn(true);
         when(reservationRepository.existsByLivreBookIdAndAdherentUserIdAndStatutIn(
                 eq(10), eq(4), any(Collection.class)
         )).thenReturn(true);
@@ -93,13 +137,16 @@ class ReservationServiceTest {
 
         when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
         when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
-        when(borrowRepository.existsByBookIdAndReturnDateIsNull(10)).thenReturn(true);
         when(reservationRepository.existsByLivreBookIdAndAdherentUserIdAndStatutIn(
                 eq(10), eq(4), any(Collection.class)
         )).thenReturn(false);
-        when(reservationRepository.countByAdherentUserIdAndStatutIn(
+        when(reservationRepository.findActiveByAdherentForUpdate(
                 eq(4), any(Collection.class)
-        )).thenReturn(3L);
+        )).thenReturn(List.of(
+                reservation(1, ReservationStatus.EN_ATTENTE),
+                reservation(2, ReservationStatus.EN_ATTENTE),
+                reservation(3, ReservationStatus.DISPONIBLE)
+        ));
 
         BusinessRuleException exception = assertThrows(
                 BusinessRuleException.class,
@@ -118,13 +165,12 @@ class ReservationServiceTest {
 
         when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
         when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
-        when(borrowRepository.existsByBookIdAndReturnDateIsNull(10)).thenReturn(true);
         when(reservationRepository.existsByLivreBookIdAndAdherentUserIdAndStatutIn(
                 eq(10), eq(4), any(Collection.class)
         )).thenReturn(false);
-        when(reservationRepository.countByAdherentUserIdAndStatutIn(
+        when(reservationRepository.findActiveByAdherentForUpdate(
                 eq(4), any(Collection.class)
-        )).thenReturn(0L);
+        )).thenReturn(Collections.emptyList());
         when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
             Reservation reservation = invocation.getArgument(0);
             reservation.setId(1);

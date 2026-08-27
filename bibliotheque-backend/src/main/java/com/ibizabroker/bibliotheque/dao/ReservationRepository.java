@@ -22,9 +22,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Intege
             Collection<ReservationStatus> statuts
     );
 
-    long countByAdherentUserIdAndStatutIn(
-            Integer adherentId,
-            Collection<ReservationStatus> statuts
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT reservation FROM Reservation reservation "
+            + "WHERE reservation.adherent.userId = :adherentId AND reservation.statut IN :statuts")
+    List<Reservation> findActiveByAdherentForUpdate(
+            @Param("adherentId") Integer adherentId,
+            @Param("statuts") Collection<ReservationStatus> statuts
     );
 
     List<Reservation> findAllByOrderByDateReservationAsc();
