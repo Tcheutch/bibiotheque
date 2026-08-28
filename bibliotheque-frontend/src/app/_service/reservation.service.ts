@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { Books } from '../_model/books';
 import { Reservation, ReservationRequest, ReservationStatus } from '../_model/reservation';
 import { Users } from '../_model/users';
@@ -12,7 +13,7 @@ import { UsersService } from './users.service';
 })
 export class ReservationService {
 
-  private baseURL = "http://localhost:8080/api/reservations";
+  private baseURL = `${environment.apiBaseUrl}/api/reservations`;
 
   constructor(
     private httpClient: HttpClient,
