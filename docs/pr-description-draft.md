@@ -14,22 +14,32 @@ un correctif d'un fichier partagé (`auth.interceptor.ts`), signalé plus bas.
 
 ## Captures à joindre
 
-Quatre captures déjà produites pendant le développement (Chromium headless,
-backend et base réels) ; à coller dans les emplacements ci-dessous à
-l'ouverture de la PR sur GitHub.
+Cinq captures produites le 28/08/2026 (Chromium headless, backend et base
+réels, protocole DevTools brut — voir `docs/audit-final-reservations.md`
+§2.3 pour le détail de la méthode) : présentes dans `screenshots/` à la
+racine du dépôt ; à coller dans les emplacements ci-dessous à l'ouverture
+de la PR sur GitHub.
 
-- [ ] **État de chargement** — sous le titre *Aperçu*, en premier.
-      Fichier : `etat-chargement.png` (spinner + « Chargement des
-      réservations… », formulaire déjà rendu, liste pas encore affichée).
-- [ ] **Liste remplie** — juste après, à côté de « Fonctionnalités ».
-      Fichier : `form-2-apres-soumission.png` (une réservation EN_ATTENTE,
-      libellés résolus, dates formatées, bandeau de succès du formulaire).
-- [ ] **Liste vide** — même section, en regard de la précédente.
-      Fichier : `etat-vide.png` (en-têtes conservés, « Aucune réservation »).
-- [ ] **Refus 409** — sous « Gestion des erreurs ».
-      Fichier : `rg-01-erreur.png` (RG-01 ; `rg-02-erreur.png` et
-      `rg-03-erreur.png` disponibles en complément si la revue veut voir
-      les trois cas).
+- [x] **État de chargement** — sous le titre *Aperçu*, en premier.
+      Fichier : `screenshots/etat-chargement.png` (spinner + « Chargement
+      des réservations… », formulaire déjà rendu, liste pas encore
+      affichée).
+- [x] **Liste remplie** — juste après, à côté de « Fonctionnalités ».
+      Fichier : `screenshots/form-2-apres-soumission.png` (une réservation
+      EN_ATTENTE, libellés résolus, dates formatées, bandeau de succès du
+      formulaire).
+- [x] **Liste vide** — même section, en regard de la précédente.
+      Fichier : `screenshots/etat-vide.png` (en-têtes conservés, « Aucune
+      réservation »).
+- [x] **Refus 409** — sous « Gestion des erreurs ».
+      Fichier : `screenshots/rg-01-erreur.png` (RG-01 ; `rg-02-erreur.png`
+      et `rg-03-erreur.png` disponibles en complément, les trois cas ont
+      été rejoués).
+- [x] **Backend injoignable** (bonus, au-delà des quatre demandées) — sous
+      « Gestion des erreurs », en complément du refus 409.
+      Fichier : `screenshots/backend-injoignable.png` (message + bouton
+      Réessayer, backend réellement arrêté puis redémarré pendant la
+      capture).
 
 ## Trajet de la donnée (clic → base → retour)
 
