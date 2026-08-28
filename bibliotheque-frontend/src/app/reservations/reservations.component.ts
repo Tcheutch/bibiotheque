@@ -90,8 +90,16 @@ export class ReservationsComponent implements OnInit {
     this.erreurAnnulation = null;
     this.reservationService.annulerReservation(id).subscribe({
       next: () => this.chargerReservations(),
+      // Amélioration au-delà du texte strict du sujet (qui ne mandate un
+      // rafraîchissement qu'au succès) : un refus d'annulation (RG-05/06,
+      // le plus souvent une course avec une autre session) révèle presque
+      // toujours que l'état affiché est périmé — on recharge donc aussi
+      // ici pour que la ligne concernée s'auto-corrige, quel que soit le
+      // code. La création n'a pas ce problème : un refus de création ne
+      // rend périmée aucune ligne déjà affichée, donc n'y est pas touchée.
       error: (erreur: HttpErrorResponse) => {
         this.erreurAnnulation = this.extraireMessageErreur(erreur);
+        this.chargerReservations();
       },
     });
   }

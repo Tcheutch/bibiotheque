@@ -117,7 +117,7 @@ describe('ReservationsComponent', () => {
 
   describe('phase 8 : refus d\'annulation (409 RG-05/RG-06)', () => {
 
-    it('409 : reprend le message du serveur tel quel, ne recharge pas la liste', () => {
+    it('409 : reprend le message du serveur tel quel, ET recharge la liste (amélioration au-delà du texte strict)', () => {
       component.onAnnulerReservation(7);
       httpMock.expectOne(`${RESERVATIONS_URL}/7/annuler`).flush(
         {
@@ -130,7 +130,25 @@ describe('ReservationsComponent', () => {
 
       expect(component.erreurAnnulation).toContain('RG-05');
       expect(component.erreurAnnulation).toContain('RG-06');
-      httpMock.expectNone(r => r.url === RESERVATIONS_URL && r.method === 'GET');
+
+      const rechargement = httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'GET');
+      rechargement.flush([]);
+
+      // Le message d'erreur survit au rechargement : chargerReservations()
+      // ne touche pas erreurAnnulation, seul un nouvel appel à
+      // onAnnulerReservation() l'efface.
+      expect(component.erreurAnnulation).toContain('RG-05');
+    });
+
+    it('un refus d\'annulation recharge la liste quel que soit le code (400/404, pas seulement 409)', () => {
+      component.onAnnulerReservation(9);
+      httpMock.expectOne(`${RESERVATIONS_URL}/9/annuler`).flush(
+        { message: "Réservation avec l'identifiant 9 introuvable.", errors: {} },
+        { status: 404, statusText: 'Not Found' }
+      );
+
+      expect(component.erreurAnnulation).toContain('introuvable');
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'GET').flush([]);
     });
 
     it('une nouvelle tentative repart propre : erreurAnnulation est effacé dès le nouvel appel', () => {
@@ -139,6 +157,8 @@ describe('ReservationsComponent', () => {
         { message: 'RG-05 : ...', errors: {} }, { status: 409, statusText: 'Conflict' }
       );
       expect(component.erreurAnnulation).not.toBeNull();
+      // Solde le rechargement déclenché par l'échec avant d'enchaîner.
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'GET').flush([]);
 
       component.onAnnulerReservation(8);
       expect(component.erreurAnnulation).toBeNull();
