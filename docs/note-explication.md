@@ -38,6 +38,16 @@ transverse.
   de test : filtre → nouvelle requête, quatre états, refus 400/404/409 à la
   création, refus 409 à l'annulation, jamais de `window.alert`.
 
+**Amélioration au-delà du texte strict du sujet** : un refus d'annulation
+(quel que soit le code, pas seulement 409) recharge maintenant aussi la
+liste — le sujet ne mandate un rafraîchissement qu'au succès, mais un
+refus d'annulation révèle presque toujours qu'une ligne affichée est
+périmée (course avec une autre session, double clic), donc `onAnnulerReservation()`
+recharge pour que la ligne concernée se corrige d'elle-même ; le message
+d'erreur reste affiché pendant et après ce rechargement. Un refus de
+création, lui, ne rend périmée aucune ligne déjà affichée : `onCreerReservation()`
+n'a donc pas été touché, conformément au texte.
+
 ## Liste (présentation pure)
 
 - **`reservations-list/reservations-list.component.ts`** — reçoit les
