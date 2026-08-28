@@ -1,0 +1,13 @@
+/* Fond clair explicite : le thème par défaut de Bootstrap (blanc + texte
+   #212529) n'est pas garanti par certains navigateurs qui forcent un rendu
+   sombre sur les pages sans fond explicite, rendant le texte illisible
+   sans sélection. On fixe ici les mêmes valeurs que celles déjà utilisées
+   par les composants Bootstrap du reste de l'application (ex. le fond
+   blanc des menus déroulants), pas une palette nouvelle. */
+:host {
+  display: block;
+  background-color: #fff;
+  color: #212529;
+  padding: 1rem 1.25rem;
+  border-radius: 0.375rem;
+}
