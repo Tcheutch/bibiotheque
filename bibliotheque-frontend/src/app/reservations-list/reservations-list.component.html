@@ -7,6 +7,10 @@
     </select>
 </div>
 
+<div *ngIf="erreurAnnulation" class="alert alert-danger" role="alert">
+    {{ erreurAnnulation }}
+</div>
+
 <table class="table table-striped">
     <thead>
         <tr>

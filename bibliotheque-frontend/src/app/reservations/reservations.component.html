@@ -27,6 +27,7 @@
     *ngIf="!chargement && !erreur"
     [reservations]="reservationsAffichables"
     [statutFiltre]="statutFiltre"
+    [erreurAnnulation]="erreurAnnulation"
     (filtreChange)="onFiltreChange($event)"
     (annuler)="onAnnulerReservation($event)">
 </app-reservations-list>

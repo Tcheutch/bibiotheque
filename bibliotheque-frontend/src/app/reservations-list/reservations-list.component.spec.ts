@@ -81,4 +81,42 @@ describe('ReservationsListComponent', () => {
     expect(el.querySelector('tbody')!.textContent).toContain('Aucune réservation');
     expect(el.querySelectorAll('tbody tr').length).toBe(1);
   });
+
+  describe('phase 8 : annulation', () => {
+
+    it('demande confirmation avant d\'émettre annuler ; refuser la confirmation n\'émet rien', () => {
+      spyOn(window, 'confirm').and.returnValue(false);
+      spyOn(component.annuler, 'emit');
+
+      component.onAnnuler(42);
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(component.annuler.emit).not.toHaveBeenCalled();
+    });
+
+    it('émet annuler(id) uniquement si la confirmation est acceptée', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      spyOn(component.annuler, 'emit');
+
+      component.onAnnuler(42);
+
+      expect(component.annuler.emit).toHaveBeenCalledWith(42);
+    });
+
+    it("n'affiche aucun bloc erreur d'annulation quand erreurAnnulation est null", () => {
+      component.erreurAnnulation = null;
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.alert-danger')).toBeNull();
+    });
+
+    it('affiche le message serveur tel quel pour un refus 409 (RG-05/RG-06)', () => {
+      component.erreurAnnulation = 'RG-05 : seules les réservations EN_ATTENTE ou DISPONIBLE peuvent être annulées.';
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.alert-danger')!.textContent).toContain('RG-05');
+    });
+  });
 });

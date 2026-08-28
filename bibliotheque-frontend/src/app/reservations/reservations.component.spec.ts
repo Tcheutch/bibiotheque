@@ -115,6 +115,43 @@ describe('ReservationsComponent', () => {
     rechargement.flush([]);
   });
 
+  describe('phase 8 : refus d\'annulation (409 RG-05/RG-06)', () => {
+
+    it('409 : reprend le message du serveur tel quel, ne recharge pas la liste', () => {
+      component.onAnnulerReservation(7);
+      httpMock.expectOne(`${RESERVATIONS_URL}/7/annuler`).flush(
+        {
+          message: 'RG-05 : seules les réservations EN_ATTENTE ou DISPONIBLE peuvent être annulées. '
+            + 'RG-06 : une réservation ANNULEE ne peut plus changer d\'état.',
+          errors: {},
+        },
+        { status: 409, statusText: 'Conflict' }
+      );
+
+      expect(component.erreurAnnulation).toContain('RG-05');
+      expect(component.erreurAnnulation).toContain('RG-06');
+      httpMock.expectNone(r => r.url === RESERVATIONS_URL && r.method === 'GET');
+    });
+
+    it('une nouvelle tentative repart propre : erreurAnnulation est effacé dès le nouvel appel', () => {
+      component.onAnnulerReservation(7);
+      httpMock.expectOne(`${RESERVATIONS_URL}/7/annuler`).flush(
+        { message: 'RG-05 : ...', errors: {} }, { status: 409, statusText: 'Conflict' }
+      );
+      expect(component.erreurAnnulation).not.toBeNull();
+
+      component.onAnnulerReservation(8);
+      expect(component.erreurAnnulation).toBeNull();
+
+      httpMock.expectOne(`${RESERVATIONS_URL}/8/annuler`).flush({});
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'GET').flush([]);
+    });
+
+    it('un succès ultérieur n\'a pas besoin d\'effacer explicitement erreurAnnulation (déjà nul au départ)', () => {
+      expect(component.erreurAnnulation).toBeNull();
+    });
+  });
+
   describe('les quatre états', () => {
 
     function domVisible() {

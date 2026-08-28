@@ -10,6 +10,8 @@ export class ReservationsListComponent {
 
   @Input() reservations: ReservationAffichage[] = [];
   @Input() statutFiltre?: ReservationStatus;
+  // Refus d'une annulation (409 RG-05/RG-06), reçu du conteneur.
+  @Input() erreurAnnulation: string | null = null;
 
   @Output() filtreChange = new EventEmitter<ReservationStatus | undefined>();
   @Output() annuler = new EventEmitter<number>();
@@ -25,6 +27,8 @@ export class ReservationsListComponent {
   }
 
   onAnnuler(id: number) {
-    this.annuler.emit(id);
+    if (confirm('Confirmez-vous l\'annulation de cette réservation ?')) {
+      this.annuler.emit(id);
+    }
   }
 }

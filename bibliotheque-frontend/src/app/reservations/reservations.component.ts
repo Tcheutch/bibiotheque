@@ -28,6 +28,9 @@ export class ReservationsComponent implements OnInit {
   erreurCreation: string | null = null;
   erreursChampsCreation: { [champ: string]: string } | null = null;
 
+  // Refus d'annulation (409 RG-05/RG-06), affiché au-dessus de la liste.
+  erreurAnnulation: string | null = null;
+
   constructor(private reservationService: ReservationService) { }
 
   ngOnInit(): void {
@@ -84,11 +87,12 @@ export class ReservationsComponent implements OnInit {
   }
 
   onAnnulerReservation(id: number) {
+    this.erreurAnnulation = null;
     this.reservationService.annulerReservation(id).subscribe({
       next: () => this.chargerReservations(),
-      // Phase 8 : affichage du refus (RG-05/RG-06) en réutilisant le même
-      // mécanisme que la création.
-      error: () => {},
+      error: (erreur: HttpErrorResponse) => {
+        this.erreurAnnulation = this.extraireMessageErreur(erreur);
+      },
     });
   }
 
