@@ -11,6 +11,7 @@ public class CorsConfiguration {
     private static final String GET = "GET";
     private static final String POST = "POST";
     private static final String PUT = "PUT";
+    private static final String PATCH = "PATCH";
     private static final String DELETE = "DELETE";
 
     @Bean
@@ -19,7 +20,7 @@ public class CorsConfiguration {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedMethods(GET, POST, PUT, DELETE)
+                        .allowedMethods(GET, POST, PUT, PATCH, DELETE)
                         .allowedHeaders("*")
                         .allowedOriginPatterns("*")
                         .allowCredentials(true);

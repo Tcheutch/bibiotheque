@@ -1,0 +1,33 @@
+<h2>Réservations</h2>
+
+<app-reservation-form
+    [livres]="livres"
+    [adherents]="adherents"
+    [reinitialiser]="resetFormulaire"
+    [erreurCreation]="erreurCreation"
+    [erreursChamps]="erreursChampsCreation"
+    (creer)="onCreerReservation($event)">
+</app-reservation-form>
+
+<hr>
+
+<div *ngIf="chargement" class="text-center my-4">
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Chargement…</span>
+    </div>
+    <p>Chargement des réservations…</p>
+</div>
+
+<div *ngIf="erreur && !chargement" class="alert alert-danger">
+    <p class="mb-2">{{ erreur }}</p>
+    <button class="btn btn-outline-danger btn-sm" (click)="chargerReservations()">Réessayer</button>
+</div>
+
+<app-reservations-list
+    *ngIf="!chargement && !erreur"
+    [reservations]="reservationsAffichables"
+    [statutFiltre]="statutFiltre"
+    [erreurAnnulation]="erreurAnnulation"
+    (filtreChange)="onFiltreChange($event)"
+    (annuler)="onAnnulerReservation($event)">
+</app-reservations-list>

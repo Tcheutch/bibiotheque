@@ -1,4 +1,5 @@
 package com.ibizabroker.bibliotheque.controller;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import com.ibizabroker.bibliotheque.dao.UsersRepository;
 import com.ibizabroker.bibliotheque.entity.Users;
@@ -14,6 +15,7 @@ import java.util.List;
 @CrossOrigin("http://localhost:4200/")
 @RestController
 @RequestMapping("/admin")
+@SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
     @Autowired
