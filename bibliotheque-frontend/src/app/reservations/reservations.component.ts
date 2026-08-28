@@ -20,6 +20,10 @@ export class ReservationsComponent implements OnInit {
   chargement = false;
   erreur: string | null = null;
 
+  // Transmis en @Input au formulaire ; incrémenté uniquement après un 201
+  // confirmé, pour déclencher sa réinitialisation (jamais au clic lui-même).
+  resetFormulaire = 0;
+
   constructor(private reservationService: ReservationService) { }
 
   ngOnInit(): void {
@@ -61,8 +65,15 @@ export class ReservationsComponent implements OnInit {
   }
 
   onCreerReservation(request: ReservationRequest) {
-    this.reservationService.creerReservation(request).subscribe(() => {
-      this.chargerReservations();
+    this.reservationService.creerReservation(request).subscribe({
+      next: () => {
+        this.chargerReservations();
+        this.resetFormulaire++;
+      },
+      // Phase 7 : affichage du message métier (400/404/409) à côté du
+      // formulaire. Pour l'instant, un échec ne réinitialise pas le
+      // formulaire (la sélection de l'utilisateur reste intacte).
+      error: () => {},
     });
   }
 

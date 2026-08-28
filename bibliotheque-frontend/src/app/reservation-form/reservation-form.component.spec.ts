@@ -42,4 +42,45 @@ describe('ReservationFormComponent', () => {
 
     expect(component.creer.emit).toHaveBeenCalledWith({ livreId: 1, adherentId: 2 });
   });
+
+  it("onSubmit n'efface pas la sélection lui-même (seul un 201 confirmé le fait)", () => {
+    component.livreId = 1;
+    component.adherentId = 2;
+    component.onSubmit();
+
+    expect(component.livreId).toBe(1);
+    expect(component.adherentId).toBe(2);
+    expect(component.succesVisible).toBeFalse();
+  });
+
+  it("un changement de reinitialiser (201 confirmé par le conteneur) vide les champs et affiche le succès", () => {
+    component.livreId = 1;
+    component.adherentId = 2;
+
+    component.reinitialiser = 1;
+    component.ngOnChanges({
+      reinitialiser: { currentValue: 1, previousValue: 0, firstChange: false, isFirstChange: () => false },
+    } as any);
+
+    expect(component.livreId).toBeUndefined();
+    expect(component.adherentId).toBeUndefined();
+    expect(component.succesVisible).toBeTrue();
+  });
+
+  it("ne montre pas de succès sur le tout premier changement (firstChange) de reinitialiser", () => {
+    component.ngOnChanges({
+      reinitialiser: { currentValue: 0, previousValue: undefined, firstChange: true, isFirstChange: () => true },
+    } as any);
+
+    expect(component.succesVisible).toBeFalse();
+  });
+
+  it('modifier un champ après un succès masque le message de succès', () => {
+    component.succesVisible = true;
+
+    component.onLivreIdChange(3);
+
+    expect(component.succesVisible).toBeFalse();
+    expect(component.livreId).toBe(3);
+  });
 });

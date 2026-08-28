@@ -87,6 +87,22 @@ describe('ReservationsComponent', () => {
     rechargement.flush([]);
   });
 
+  it('la création réussie (201) incrémente resetFormulaire ; un échec ne le fait pas', () => {
+    expect(component.resetFormulaire).toBe(0);
+
+    component.onCreerReservation({ livreId: 1, adherentId: 2 });
+    httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush({});
+    httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'GET').flush([]);
+
+    expect(component.resetFormulaire).toBe(1);
+
+    component.onCreerReservation({ livreId: 3, adherentId: 4 });
+    httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST')
+      .flush({ message: 'RG-01 : le livre doit être indisponible pour être réservé.' }, { status: 409, statusText: 'Conflict' });
+
+    expect(component.resetFormulaire).toBe(1);
+  });
+
   it('une annulation réussie recharge la liste (nouvel appel, pas de mutation locale)', () => {
     component.onAnnulerReservation(7);
 

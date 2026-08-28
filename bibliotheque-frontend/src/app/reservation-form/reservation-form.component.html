@@ -4,7 +4,8 @@
 
         <div class="form-group">
             <label style="margin-bottom: 10px"> Livre </label>
-            <select class="form-select" style="margin-bottom: 10px" id="livreId" [(ngModel)] = "livreId" name="livreId">
+            <select class="form-select" style="margin-bottom: 10px" id="livreId"
+                    [ngModel]="livreId" (ngModelChange)="onLivreIdChange($event)" name="livreId">
                 <option [ngValue]="undefined">-- Choisir un livre --</option>
                 <option *ngFor="let livre of livres" [ngValue]="livre.bookId">{{ livre.bookName }}</option>
             </select>
@@ -12,12 +13,17 @@
 
         <div class="form-group">
             <label style="margin-bottom: 10px"> Adhérent </label>
-            <select class="form-select" style="margin-bottom: 10px" id="adherentId" [(ngModel)] = "adherentId" name="adherentId">
+            <select class="form-select" style="margin-bottom: 10px" id="adherentId"
+                    [ngModel]="adherentId" (ngModelChange)="onAdherentIdChange($event)" name="adherentId">
                 <option [ngValue]="undefined">-- Choisir un adhérent --</option>
                 <option *ngFor="let adherent of adherents" [ngValue]="adherent.userId">{{ adherent.name }}</option>
             </select>
         </div>
 
         <button class="btn btn-success" type="submit" [disabled]="!livreId || !adherentId"> Réserver </button>
+
+        <div *ngIf="succesVisible" class="alert alert-success mt-2" role="status">
+            Réservation créée avec succès.
+        </div>
     </form>
 </div>
