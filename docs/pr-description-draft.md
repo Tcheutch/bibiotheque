@@ -57,6 +57,42 @@ UPDATE`), vérifie RG-01/RG-02/RG-03, et soit persiste via
 s'affiche à côté du formulaire — jamais de rechargement de page dans aucun
 des deux cas.
 
+## Règles métier (RG) — où chacune est implémentée côté frontend
+
+RG-01 à RG-03 et RG-05/RG-06 sont des refus (409) : le backend les décide,
+le frontend se contente de reprendre `ApiError.message` tel quel et de
+l'afficher — jamais de traduction ni de reformulation côté client.
+
+- **RG-01** (le livre doit être indisponible) — refus reçu par
+  `ReservationsComponent.onCreerReservation()` (`reservations/
+  reservations.component.ts:74-87`), stocké dans `erreurCreation`, affiché
+  par `ReservationFormComponent` dans le bloc `*ngIf="erreurCreation"`
+  (`reservation-form/reservation-form.component.html:29-34`).
+- **RG-02** (réservation déjà active pour ce livre) — même chemin
+  d'affichage que RG-01 (même refus de création, même bloc).
+- **RG-03** (quota de 3 réservations actives dépassé) — même chemin
+  d'affichage que RG-01.
+- **RG-04** (date d'expiration = date de réservation + 7 jours) — n'est
+  *pas* un refus : c'est une valeur calculée côté serveur
+  (`ReservationService.create()`), que le frontend ne fait qu'afficher telle
+  que renvoyée par l'API, mise en forme par le pipe `date` dans
+  `reservations-list/reservations-list.component.html:34`. Aucune logique
+  de calcul de date côté frontend.
+- **RG-05** (seules `EN_ATTENTE`/`DISPONIBLE` sont annulables) — anticipée
+  côté client par `ReservationsListComponent.estAnnulable()`
+  (`reservations-list/reservations-list.component.ts:21-23`), qui masque le
+  bouton Annuler et rend le cas normalement inatteignable via l'UI ; si elle
+  survient tout de même (course avec une autre session), le refus est reçu
+  par `ReservationsComponent.onAnnulerReservation()`
+  (`reservations/reservations.component.ts:89-105`), stocké dans
+  `erreurAnnulation`, affiché par `ReservationsListComponent` dans le bloc
+  `*ngIf="erreurAnnulation"` (`reservations-list/
+  reservations-list.component.html:10-12`).
+- **RG-06** (une réservation `ANNULEE` ne peut plus changer d'état) — le
+  backend renvoie RG-05 et RG-06 dans un seul et même message 409 (les deux
+  règles se recoupent sur ce cas) ; même chemin d'affichage que RG-05,
+  aucun traitement séparé côté frontend.
+
 ## Points d'attention pour la revue
 
 ### Fichier partagé modifié hors du périmètre strict Réservation
@@ -83,6 +119,17 @@ tous les cas : `NullInjectorError` (`No provider for HttpClient!` ou
 `HttpClientTestingModule` ni `RouterTestingModule` dans leur
 `TestBed.configureTestingModule`, alors que les composants/services testés
 en dépendent.
+
+Liste exacte des 19 : `AppComponent` (×2 : titre + rendu), `AuthGuard`,
+`BookDetailsComponent`, `BooksListComponent`, `BooksService`,
+`BorrowBookComponent`, `BorrowService`, `CreateBookComponent`,
+`HeaderComponent`, `LoginComponent`, `LogoutComponent`,
+`RegistrationComponent`, `ReturnBookComponent`, `UpdateBookComponent`,
+`UpdateUserComponent`, `UserDetailsComponent`, `UsersListComponent`,
+`UsersService`. Aucun n'appartient au module Réservation (aucun des noms
+ci-dessus ne commence par `Reservation`, et les cinq fichiers
+`reservation*.spec.ts`/`reservation-*.spec.ts` de cette branche, plus
+`auth.interceptor.spec.ts`, sont tous dans les 60 qui passent).
 
 Vérifié explicitement (grep sur tous les `*.spec.ts`) : aucun de ces
 19 fichiers ne référence `HTTP_INTERCEPTORS` ni `AuthInterceptor` — seul
