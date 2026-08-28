@@ -1,22 +1,61 @@
 # Brouillon de description de Pull Request
 
-Brouillon tenu à jour au fil des phases (voir §14 du sujet). La version
-finale sera rédigée une fois les phases 3 à 8 validées.
+Rédigé une fois les phases 3 à 8 validées et vérifiées en conditions
+réelles (Chromium headless piloté via le protocole DevTools, backend et
+base de données réels — pas de simulation pure).
 
 ## Résumé
 
-_(à compléter en fin de branche : une à deux phrases sur l'écran livré)_
+Ajoute l'écran de gestion des réservations (`/reservations`, réservé aux
+comptes Admin) : liste filtrable par statut, formulaire de création, et
+annulation avec confirmation. Consomme l'API `/api/reservations` du module
+Réservation (séance 2) sans y toucher — seule modification hors périmètre :
+un correctif d'un fichier partagé (`auth.interceptor.ts`), signalé plus bas.
 
 ## Captures à joindre
 
-- [ ] État de chargement — emplacement : _(à définir)_
-- [ ] Liste remplie — emplacement : _(à définir)_
-- [ ] Liste vide — emplacement : _(à définir)_
-- [ ] Refus 409 (RG-01/02/03) — emplacement : _(à définir)_
+Quatre captures déjà produites pendant le développement (Chromium headless,
+backend et base réels) ; à coller dans les emplacements ci-dessous à
+l'ouverture de la PR sur GitHub.
+
+- [ ] **État de chargement** — sous le titre *Aperçu*, en premier.
+      Fichier : `etat-chargement.png` (spinner + « Chargement des
+      réservations… », formulaire déjà rendu, liste pas encore affichée).
+- [ ] **Liste remplie** — juste après, à côté de « Fonctionnalités ».
+      Fichier : `form-2-apres-soumission.png` (une réservation EN_ATTENTE,
+      libellés résolus, dates formatées, bandeau de succès du formulaire).
+- [ ] **Liste vide** — même section, en regard de la précédente.
+      Fichier : `etat-vide.png` (en-têtes conservés, « Aucune réservation »).
+- [ ] **Refus 409** — sous « Gestion des erreurs ».
+      Fichier : `rg-01-erreur.png` (RG-01 ; `rg-02-erreur.png` et
+      `rg-03-erreur.png` disponibles en complément si la revue veut voir
+      les trois cas).
 
 ## Trajet de la donnée (clic → base → retour)
 
-_(à rédiger en fin de branche, une fois toutes les phases posées)_
+Sur le modèle du tableau du `README.md` (§6) pour la création d'un livre,
+transposé à la création d'une réservation : l'utilisateur choisit un livre
+et un adhérent par leur libellé dans `reservation-form.component.html`
+(`[(ngModel)]` sur les deux `<select>`) ; au clic sur *Réserver*,
+`ReservationFormComponent.onSubmit()` émet `(creer)` avec `{livreId,
+adherentId}` uniquement. Le conteneur (`ReservationsComponent
+.onCreerReservation()`) reçoit l'événement et appelle
+`ReservationService.creerReservation()`, seul point d'appel HTTP du module,
+qui fait `POST http://localhost:8080/api/reservations`.
+`auth.interceptor.ts` ajoute l'en-tête `Authorization: Bearer <token>` à la
+volée. Côté serveur, `ReservationController.create()` reçoit le JSON,
+`ReservationService.create()` verrouille livre et adhérent (`SELECT ... FOR
+UPDATE`), vérifie RG-01/RG-02/RG-03, et soit persiste via
+`ReservationRepository.save()` (Hibernate émet l'`INSERT`, visible avec
+`spring.jpa.show-sql=true`), soit lève `BusinessRuleException` /
+`NotFoundException`, traduite en 409/404 par
+`ReservationExceptionHandler`. La réponse (`ReservationResponse` ou
+`ApiError`) revient au `subscribe()` du conteneur : en succès,
+`chargerReservations()` relance un `GET` qui rafraîchit le tableau et
+`resetFormulaire` vide le formulaire ; en échec, `erreurCreation` (et
+`erreursChampsCreation` pour un 400) reprend le message serveur tel quel et
+s'affiche à côté du formulaire — jamais de rechargement de page dans aucun
+des deux cas.
 
 ## Points d'attention pour la revue
 
