@@ -1,0 +1,37 @@
+<div class="mb-3">
+    <label style="margin-right: 10px"> Filtrer par statut </label>
+    <select class="form-select" style="max-width: 260px; display:inline-block; width:auto;"
+            [ngModel]="statutFiltre" (ngModelChange)="onFiltreChange($event)">
+        <option [ngValue]="undefined">Tous</option>
+        <option *ngFor="let statut of statutsDisponibles" [ngValue]="statut">{{ statut }}</option>
+    </select>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th> Livre </th>
+            <th> Adhérent </th>
+            <th> Statut </th>
+            <th> Date de réservation </th>
+            <th> Date d'expiration </th>
+            <th> Action </th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr *ngFor="let reservation of reservations">
+            <td> {{ reservation.titreLivre }} </td>
+            <td> {{ reservation.nomAdherent }} </td>
+            <td> {{ reservation.statut }} </td>
+            <td> {{ reservation.dateReservation | date:'dd/MM/yyyy HH:mm' }} </td>
+            <td> {{ reservation.dateExpiration | date:'dd/MM/yyyy HH:mm' }} </td>
+            <td>
+                <button *ngIf="estAnnulable(reservation.statut)"
+                        class="btn btn-danger btn-sm"
+                        (click)="onAnnuler(reservation.id)">
+                    Annuler
+                </button>
+            </td>
+        </tr>
+    </tbody>
+</table>

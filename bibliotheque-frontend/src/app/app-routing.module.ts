@@ -8,6 +8,7 @@ import { ForbiddenComponent } from './forbidden/forbidden.component';
 import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
 import { RegistrationComponent } from './registration/registration.component';
+import { ReservationsComponent } from './reservations/reservations.component';
 import { ReturnBookComponent } from './return-book/return-book.component';
 import { UpdateBookComponent } from './update-book/update-book.component';
 import { UpdateUserComponent } from './update-user/update-user.component';
@@ -25,6 +26,7 @@ const routes: Routes = [
   {path: 'register-user', component: RegistrationComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
   {path: 'user-details/:userId', component: UserDetailsComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
   {path: 'update-user/:userId', component: UpdateUserComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
+  {path: 'reservations', component: ReservationsComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
   {path: 'login', component: LoginComponent},
   {path: 'forbidden', component: ForbiddenComponent},
   {path: 'borrow-book', component: BorrowBookComponent, canActivate:[AuthGuard], data:{roles:['User']}},

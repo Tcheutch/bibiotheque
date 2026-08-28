@@ -1,0 +1,16 @@
+<h2>Réservations</h2>
+
+<app-reservation-form
+    [livres]="livres"
+    [adherents]="adherents"
+    (creer)="onCreerReservation($event)">
+</app-reservation-form>
+
+<hr>
+
+<app-reservations-list
+    [reservations]="reservationsAffichables"
+    [statutFiltre]="statutFiltre"
+    (filtreChange)="onFiltreChange($event)"
+    (annuler)="onAnnulerReservation($event)">
+</app-reservations-list>
