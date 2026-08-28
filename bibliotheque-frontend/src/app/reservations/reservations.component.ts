@@ -24,6 +24,10 @@ export class ReservationsComponent implements OnInit {
   // confirmé, pour déclencher sa réinitialisation (jamais au clic lui-même).
   resetFormulaire = 0;
 
+  // Refus de création (400/404/409), affichés à côté du formulaire.
+  erreurCreation: string | null = null;
+  erreursChampsCreation: { [champ: string]: string } | null = null;
+
   constructor(private reservationService: ReservationService) { }
 
   ngOnInit(): void {
@@ -65,21 +69,26 @@ export class ReservationsComponent implements OnInit {
   }
 
   onCreerReservation(request: ReservationRequest) {
+    this.erreurCreation = null;
+    this.erreursChampsCreation = null;
     this.reservationService.creerReservation(request).subscribe({
       next: () => {
         this.chargerReservations();
         this.resetFormulaire++;
       },
-      // Phase 7 : affichage du message métier (400/404/409) à côté du
-      // formulaire. Pour l'instant, un échec ne réinitialise pas le
-      // formulaire (la sélection de l'utilisateur reste intacte).
-      error: () => {},
+      error: (erreur: HttpErrorResponse) => {
+        this.erreurCreation = this.extraireMessageErreur(erreur);
+        this.erreursChampsCreation = this.extraireErreursChamps(erreur);
+      },
     });
   }
 
   onAnnulerReservation(id: number) {
-    this.reservationService.annulerReservation(id).subscribe(() => {
-      this.chargerReservations();
+    this.reservationService.annulerReservation(id).subscribe({
+      next: () => this.chargerReservations(),
+      // Phase 8 : affichage du refus (RG-05/RG-06) en réutilisant le même
+      // mécanisme que la création.
+      error: () => {},
     });
   }
 
@@ -102,5 +111,15 @@ export class ReservationsComponent implements OnInit {
       return erreur.error.message;
     }
     return "Le serveur est injoignable. Vérifiez qu'il est démarré, puis réessayez.";
+  }
+
+  // Détail par champ (ApiError.errors), présent uniquement pour un 400 de
+  // validation. Vide pour un 404/409 : .message seul suffit dans ce cas.
+  private extraireErreursChamps(erreur: HttpErrorResponse): { [champ: string]: string } | null {
+    const erreurs = erreur.error && typeof erreur.error === 'object' ? erreur.error.errors : null;
+    if (erreurs && typeof erreurs === 'object' && Object.keys(erreurs).length > 0) {
+      return erreurs;
+    }
+    return null;
   }
 }

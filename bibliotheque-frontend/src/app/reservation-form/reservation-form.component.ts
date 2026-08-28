@@ -17,6 +17,9 @@ export class ReservationFormComponent implements OnChanges {
   // sur Réserver lui-même (sinon un 409/400/404 effacerait la sélection
   // de l'utilisateur avant même qu'il voie le message d'erreur).
   @Input() reinitialiser = 0;
+  // Refus de la dernière tentative (400/404/409), reçu du conteneur.
+  @Input() erreurCreation: string | null = null;
+  @Input() erreursChamps: { [champ: string]: string } | null = null;
 
   @Output() creer = new EventEmitter<ReservationRequest>();
 

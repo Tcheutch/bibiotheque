@@ -25,5 +25,12 @@
         <div *ngIf="succesVisible" class="alert alert-success mt-2" role="status">
             Réservation créée avec succès.
         </div>
+
+        <div *ngIf="erreurCreation" class="alert alert-danger mt-2" role="alert">
+            <p class="mb-1">{{ erreurCreation }}</p>
+            <ul *ngIf="erreursChamps" class="mb-0 ps-3">
+                <li *ngFor="let champ of erreursChamps | keyvalue">{{ champ.value }}</li>
+            </ul>
+        </div>
     </form>
 </div>

@@ -83,4 +83,48 @@ describe('ReservationFormComponent', () => {
     expect(component.succesVisible).toBeFalse();
     expect(component.livreId).toBe(3);
   });
+
+  describe('phase 7 : affichage du refus métier', () => {
+
+    it("n'affiche aucun bloc erreur quand erreurCreation est null", () => {
+      component.erreurCreation = null;
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.alert-danger')).toBeNull();
+    });
+
+    it('affiche le message du serveur tel quel pour un 409 (RG-01/02/03), sans liste de détail par champ', () => {
+      component.erreurCreation = 'RG-01 : le livre doit être indisponible pour être réservé.';
+      component.erreursChamps = null;
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const bloc = el.querySelector('.alert-danger')!;
+      expect(bloc.textContent).toContain('RG-01 : le livre doit être indisponible pour être réservé.');
+      expect(bloc.querySelector('ul')).toBeNull();
+    });
+
+    it('affiche le message ET le détail par champ pour un 400 de validation', () => {
+      component.erreurCreation = 'Validation échouée.';
+      component.erreursChamps = { adherentId: 'adherentId est obligatoire' };
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const bloc = el.querySelector('.alert-danger')!;
+      expect(bloc.textContent).toContain('Validation échouée.');
+      expect(bloc.textContent).toContain('adherentId est obligatoire');
+    });
+
+    it('affiche le message adapté pour un 404, sans liste de détail par champ', () => {
+      component.erreurCreation = "Livre avec l'identifiant 999 introuvable.";
+      component.erreursChamps = null;
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const bloc = el.querySelector('.alert-danger')!;
+      expect(bloc.textContent).toContain("Livre avec l'identifiant 999 introuvable.");
+      expect(bloc.querySelector('ul')).toBeNull();
+    });
+  });
 });

@@ -202,4 +202,93 @@ describe('ReservationsComponent', () => {
       expect(component.reservations.length).toBe(1);
     });
   });
+
+  describe('phase 7 : refus métier à la création', () => {
+
+    it('409 RG-01 : reprend le message du serveur tel quel, pas de détail par champ', () => {
+      component.onCreerReservation({ livreId: 1, adherentId: 2 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: 'RG-01 : le livre doit être indisponible pour être réservé.', errors: {} },
+        { status: 409, statusText: 'Conflict' }
+      );
+
+      expect(component.erreurCreation).toBe('RG-01 : le livre doit être indisponible pour être réservé.');
+      expect(component.erreursChampsCreation).toBeNull();
+    });
+
+    it('409 RG-02 et RG-03 produisent chacun leur propre message (pas de texte générique partagé)', () => {
+      component.onCreerReservation({ livreId: 1, adherentId: 2 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: "RG-02 : l'adhérent possède déjà une réservation active pour ce livre.", errors: {} },
+        { status: 409, statusText: 'Conflict' }
+      );
+      expect(component.erreurCreation).toContain('RG-02');
+
+      component.onCreerReservation({ livreId: 1, adherentId: 3 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: 'RG-03 : l\'adhérent ne peut pas dépasser 3 réservations actives simultanées.', errors: {} },
+        { status: 409, statusText: 'Conflict' }
+      );
+      expect(component.erreurCreation).toContain('RG-03');
+    });
+
+    it('400 de validation : message + détail par champ (errors), les deux affichables', () => {
+      component.onCreerReservation({ livreId: 1, adherentId: undefined as any });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: 'Validation échouée.', errors: { adherentId: 'adherentId est obligatoire' } },
+        { status: 400, statusText: 'Bad Request' }
+      );
+
+      expect(component.erreurCreation).toBe('Validation échouée.');
+      expect(component.erreursChampsCreation).toEqual({ adherentId: 'adherentId est obligatoire' });
+    });
+
+    it('404 : message adapté, pas de détail par champ (errors vide)', () => {
+      component.onCreerReservation({ livreId: 999, adherentId: 2 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: "Livre avec l'identifiant 999 introuvable.", errors: {} },
+        { status: 404, statusText: 'Not Found' }
+      );
+
+      expect(component.erreurCreation).toBe("Livre avec l'identifiant 999 introuvable.");
+      expect(component.erreursChampsCreation).toBeNull();
+    });
+
+    it('corps vide/inexploitable : message de repli distinct, jamais un message générique du type "une erreur est survenue"', () => {
+      component.onCreerReservation({ livreId: 1, adherentId: 2 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST')
+        .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+      expect(component.erreurCreation).toContain('injoignable');
+      expect(component.erreurCreation?.toLowerCase()).not.toContain('une erreur est survenue');
+    });
+
+    it('une nouvelle tentative repart propre : erreurCreation est effacé dès le nouvel appel', () => {
+      component.onCreerReservation({ livreId: 1, adherentId: 2 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: 'RG-01 : le livre doit être indisponible pour être réservé.', errors: {} },
+        { status: 409, statusText: 'Conflict' }
+      );
+      expect(component.erreurCreation).not.toBeNull();
+
+      component.onCreerReservation({ livreId: 5, adherentId: 2 });
+      expect(component.erreurCreation).toBeNull();
+      expect(component.erreursChampsCreation).toBeNull();
+
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush({});
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'GET').flush([]);
+    });
+
+    it('un refus ne déclenche jamais window.alert (interdit du sujet)', () => {
+      spyOn(window, 'alert');
+
+      component.onCreerReservation({ livreId: 1, adherentId: 2 });
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL && r.method === 'POST').flush(
+        { message: 'RG-01 : le livre doit être indisponible pour être réservé.', errors: {} },
+        { status: 409, statusText: 'Conflict' }
+      );
+
+      expect(window.alert).not.toHaveBeenCalled();
+    });
+  });
 });
