@@ -98,4 +98,92 @@ describe('ReservationsComponent', () => {
     expect(rechargement.request.method).toBe('GET');
     rechargement.flush([]);
   });
+
+  describe('les quatre états', () => {
+
+    function domVisible() {
+      const el: HTMLElement = fixture.nativeElement;
+      return {
+        chargement: !!el.querySelector('.spinner-border'),
+        erreur: !!el.querySelector('.alert-danger'),
+        liste: !!el.querySelector('app-reservations-list'),
+      };
+    }
+
+    it('passe par CHARGEMENT (indicateur visible, liste absente) pendant l\'appel', () => {
+      component.chargerReservations();
+      fixture.detectChanges();
+
+      expect(component.chargement).toBeTrue();
+      const visible = domVisible();
+      expect(visible.chargement).toBeTrue();
+      expect(visible.erreur).toBeFalse();
+      expect(visible.liste).toBeFalse();
+
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL).flush([]);
+    });
+
+    it('un succès repasse chargement à false et affiche la liste (DONNEES/VIDE), plus de spinner', () => {
+      component.chargerReservations();
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL).flush([]);
+      fixture.detectChanges();
+
+      expect(component.chargement).toBeFalse();
+      expect(component.erreur).toBeNull();
+      const visible = domVisible();
+      expect(visible.chargement).toBeFalse();
+      expect(visible.erreur).toBeFalse();
+      expect(visible.liste).toBeTrue();
+    });
+
+    it('un échec remet chargement à zéro (jamais de spinner qui tourne indéfiniment) et affiche ERREUR', () => {
+      component.chargerReservations();
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL)
+        .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+      fixture.detectChanges();
+
+      expect(component.chargement).toBeFalse();
+      expect(component.erreur).not.toBeNull();
+      const visible = domVisible();
+      expect(visible.chargement).toBeFalse();
+      expect(visible.erreur).toBeTrue();
+      expect(visible.liste).toBeFalse();
+    });
+
+    it('reprend le message ApiError du serveur tel quel (500 avec corps exploitable)', () => {
+      component.chargerReservations();
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL)
+        .flush({ message: 'Erreur interne du serveur.' }, { status: 500, statusText: 'Internal Server Error' });
+
+      expect(component.erreur).toBe('Erreur interne du serveur.');
+    });
+
+    it('sans corps exploitable (backend injoignable), affiche un message de repli distinct d\'un message métier', () => {
+      component.chargerReservations();
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL)
+        .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+      expect(component.erreur).toContain('injoignable');
+      expect(component.erreur).not.toMatch(/^RG-\d/);
+    });
+
+    it('le bouton Réessayer (rappel de chargerReservations) relance réellement un appel HTTP', () => {
+      component.chargerReservations();
+      httpMock.expectOne(r => r.url === RESERVATIONS_URL)
+        .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+      expect(component.erreur).not.toBeNull();
+
+      component.chargerReservations();
+
+      const nouvelAppel = httpMock.expectOne(r => r.url === RESERVATIONS_URL);
+      nouvelAppel.flush([{
+        id: 1, livreId: 1, adherentId: 1,
+        dateReservation: new Date(), dateExpiration: new Date(),
+        statut: ReservationStatus.EN_ATTENTE,
+      }]);
+
+      expect(component.erreur).toBeNull();
+      expect(component.reservations.length).toBe(1);
+    });
+  });
 });

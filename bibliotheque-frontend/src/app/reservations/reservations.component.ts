@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Books } from '../_model/books';
 import { Reservation, ReservationAffichage, ReservationRequest, ReservationStatus } from '../_model/reservation';
 import { Users } from '../_model/users';
@@ -15,6 +16,9 @@ export class ReservationsComponent implements OnInit {
   livres: Books[] = [];
   adherents: Users[] = [];
   statutFiltre?: ReservationStatus;
+
+  chargement = false;
+  erreur: string | null = null;
 
   constructor(private reservationService: ReservationService) { }
 
@@ -37,8 +41,17 @@ export class ReservationsComponent implements OnInit {
   }
 
   chargerReservations() {
-    this.reservationService.listerReservations(this.statutFiltre).subscribe(data => {
-      this.reservations = data;
+    this.chargement = true;
+    this.erreur = null;
+    this.reservationService.listerReservations(this.statutFiltre).subscribe({
+      next: (data) => {
+        this.reservations = data;
+        this.chargement = false;
+      },
+      error: (erreur: HttpErrorResponse) => {
+        this.erreur = this.extraireMessageErreur(erreur);
+        this.chargement = false;
+      },
     });
   }
 
@@ -67,5 +80,16 @@ export class ReservationsComponent implements OnInit {
   private libelleAdherent(adherentId: number): string {
     const adherent = this.adherents.find(a => a.userId === adherentId);
     return adherent ? adherent.name : `Adhérent #${adherentId}`;
+  }
+
+  // Reprend le message métier du serveur tel quel (ApiError.message). Le
+  // message de repli ne sert que si le corps est absent ou inexploitable
+  // (ex. serveur injoignable) : formulé pour ne pas ressembler à un message
+  // métier, afin que les deux restent distinguables à l'écran.
+  private extraireMessageErreur(erreur: HttpErrorResponse): string {
+    if (erreur.error && typeof erreur.error === 'object' && erreur.error.message) {
+      return erreur.error.message;
+    }
+    return "Le serveur est injoignable. Vérifiez qu'il est démarré, puis réessayez.";
   }
 }

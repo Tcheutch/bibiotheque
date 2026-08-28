@@ -69,4 +69,16 @@ describe('ReservationsListComponent', () => {
     const bouton = (fixture.nativeElement as HTMLElement).querySelector('tbody tr button');
     expect(bouton).toBeNull();
   });
+
+  it('liste vide : message explicite, en-têtes de colonnes conservés', () => {
+    component.reservations = [];
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    const entetes = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent!.trim());
+
+    expect(entetes).toEqual(['Livre', 'Adhérent', 'Statut', 'Date de réservation', "Date d'expiration", 'Action']);
+    expect(el.querySelector('tbody')!.textContent).toContain('Aucune réservation');
+    expect(el.querySelectorAll('tbody tr').length).toBe(1);
+  });
 });
