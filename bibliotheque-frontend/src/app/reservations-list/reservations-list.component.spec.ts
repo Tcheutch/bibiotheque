@@ -70,6 +70,32 @@ describe('ReservationsListComponent', () => {
     expect(bouton).toBeNull();
   });
 
+  it("n'affiche pas le bouton Annuler pour une réservation EXPIREE", () => {
+    component.reservations = [{
+      id: 2, livreId: 1, adherentId: 1,
+      dateReservation: new Date() as any, dateExpiration: new Date() as any,
+      statut: ReservationStatus.EXPIREE,
+      titreLivre: 'X', nomAdherent: 'Y',
+    }];
+    fixture.detectChanges();
+
+    const bouton = (fixture.nativeElement as HTMLElement).querySelector('tbody tr button');
+    expect(bouton).toBeNull();
+  });
+
+  it("n'affiche pas le bouton Annuler pour une réservation HONOREE", () => {
+    component.reservations = [{
+      id: 3, livreId: 1, adherentId: 1,
+      dateReservation: new Date() as any, dateExpiration: new Date() as any,
+      statut: ReservationStatus.HONOREE,
+      titreLivre: 'X', nomAdherent: 'Y',
+    }];
+    fixture.detectChanges();
+
+    const bouton = (fixture.nativeElement as HTMLElement).querySelector('tbody tr button');
+    expect(bouton).toBeNull();
+  });
+
   it('liste vide : message explicite, en-têtes de colonnes conservés', () => {
     component.reservations = [];
     fixture.detectChanges();
