@@ -86,6 +86,27 @@
 					</excludes>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>enforce-java-version</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireJavaVersion>
+									<version>[17,18)</version>
+									<message>Ce projet requiert le JDK 17 (Spring Boot 2.7.18 / Lombok 1.18.30 ne supportent pas les JDK plus recents : l'annotation processing de Lombok echoue silencieusement, ce qui produit des dizaines d'erreurs "cannot find symbol" sur des accesseurs/mutateurs generes). Verifiez JAVA_HOME.</message>
+								</requireJavaVersion>
+							</rules>
+							<fail>true</fail>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 	<repositories>
