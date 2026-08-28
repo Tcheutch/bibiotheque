@@ -23,8 +23,8 @@
             <td> {{ reservation.titreLivre }} </td>
             <td> {{ reservation.nomAdherent }} </td>
             <td> {{ reservation.statut }} </td>
-            <td> {{ reservation.dateReservation | date:'dd/MM/yyyy HH:mm' }} </td>
-            <td> {{ reservation.dateExpiration | date:'dd/MM/yyyy HH:mm' }} </td>
+            <td> {{ reservation.dateReservation | date:'dd/MM/yyyy HH:mm':'UTC' }} </td>
+            <td> {{ reservation.dateExpiration | date:'dd/MM/yyyy HH:mm':'UTC' }} </td>
             <td>
                 <button *ngIf="estAnnulable(reservation.statut)"
                         class="btn btn-danger btn-sm"
