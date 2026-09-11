@@ -10,14 +10,20 @@ import com.ibizabroker.bibliotheque.entity.Borrow;
 import com.ibizabroker.bibliotheque.entity.ReservationStatus;
 import com.ibizabroker.bibliotheque.entity.Users;
 import com.ibizabroker.bibliotheque.exceptions.BusinessRuleException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -30,6 +36,25 @@ class ReservationIntegrationTest {
     @Autowired private BooksRepository booksRepository;
     @Autowired private UsersRepository usersRepository;
     @Autowired private BorrowRepository borrowRepository;
+
+    // Ces deux tests couvrent RG-01/RG-04, indépendantes du rôle de
+    // l'appelant : contexte Bibliothécaire (Admin) fixé ici, seul cas où
+    // create() n'a besoin d'aucun autre appel à CurrentUserService
+    // (adherentId vient du corps, pas du token). Sécurité RS-01/RS-02/RS-03
+    // couverte par ReservationSecurityIntegrationTest (vrai flux HTTP).
+    @BeforeEach
+    void authenticateAsAdmin() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "it_res_admin", null, List.of(new SimpleGrantedAuthority("ROLE_Admin"))
+                )
+        );
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @Transactional

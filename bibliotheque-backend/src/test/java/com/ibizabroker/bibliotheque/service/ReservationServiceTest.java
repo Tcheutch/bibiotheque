@@ -10,6 +10,7 @@ import com.ibizabroker.bibliotheque.entity.Reservation;
 import com.ibizabroker.bibliotheque.entity.ReservationStatus;
 import com.ibizabroker.bibliotheque.entity.Users;
 import com.ibizabroker.bibliotheque.exceptions.BusinessRuleException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,9 +41,21 @@ class ReservationServiceTest {
     @Mock private ReservationRepository reservationRepository;
     @Mock private BooksRepository booksRepository;
     @Mock private UsersRepository usersRepository;
+    @Mock private CurrentUserService currentUserService;
 
     @InjectMocks
     private ReservationService reservationService;
+
+    // Ces tests couvrent les règles métier RG-01..RG-06, indépendantes du
+    // rôle de l'appelant ; on fixe donc un contexte Bibliothécaire (Admin),
+    // seul cas où create()/cancel() n'ont besoin d'aucune autre interaction
+    // avec CurrentUserService (adherentId vient du corps, pas du token ;
+    // aucun contrôle de propriété). RS-04/RS-03/RS-05 ont leurs propres
+    // tests dédiés (ReservationIntegrationTest).
+    @BeforeEach
+    void setUpCallerAsAdmin() {
+        when(currentUserService.isAdmin()).thenReturn(true);
+    }
 
     @Test
     void rg01ShouldRejectBookWithAvailableCopies() {
@@ -155,6 +168,35 @@ class ReservationServiceTest {
 
         assertTrue(exception.getMessage().contains("RG-03"));
         verify(reservationRepository, never()).save(any(Reservation.class));
+    }
+
+    @Test
+    void rg03ShouldAllowThirdActiveReservationWhenOnlyTwoActiveExist() {
+        ReservationRequest request = request(10, 4);
+        Books livre = book(10, 0);
+        Users adherent = user(4);
+
+        when(booksRepository.findByIdForUpdate(10)).thenReturn(Optional.of(livre));
+        when(usersRepository.findByIdForUpdate(4)).thenReturn(Optional.of(adherent));
+        when(reservationRepository.existsByLivreBookIdAndAdherentUserIdAndStatutIn(
+                eq(10), eq(4), any(Collection.class)
+        )).thenReturn(false);
+        when(reservationRepository.findActiveByAdherentForUpdate(
+                eq(4), any(Collection.class)
+        )).thenReturn(List.of(
+                reservation(1, ReservationStatus.EN_ATTENTE),
+                reservation(2, ReservationStatus.DISPONIBLE)
+        ));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
+            Reservation reservation = invocation.getArgument(0);
+            reservation.setId(3);
+            return reservation;
+        });
+
+        ReservationResponse response = reservationService.create(request);
+
+        assertEquals(ReservationStatus.EN_ATTENTE, response.getStatut());
+        verify(reservationRepository).save(any(Reservation.class));
     }
 
     @Test
