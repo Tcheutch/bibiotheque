@@ -121,6 +121,11 @@ seulement le premier essai`.
 
 ## Résultats de tests
 
+Capture réelle des deux suites (`./mvnw test` et `npx ng test --watch=false
+--browsers=ChromeHeadless`, exécutées juste avant l'ouverture de cette PR) :
+
+![Résultats des tests backend et frontend](screenshots/test-results-securite.png)
+
 **Backend — 21/21, `BUILD SUCCESS`** (`./mvnw clean test`, PostgreSQL réel) :
 - `ReservationServiceTest` : 12 tests (dont le cas RG-03 manquant ajouté,
   2 actives → succès, sans toucher au cas 3 actives → refus déjà présent).
