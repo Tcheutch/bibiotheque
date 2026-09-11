@@ -4,6 +4,7 @@ import { Books } from '../_model/books';
 import { Reservation, ReservationAffichage, ReservationRequest, ReservationStatus } from '../_model/reservation';
 import { Users } from '../_model/users';
 import { ReservationService } from '../_service/reservation.service';
+import { UserAuthService } from '../_service/user-auth.service';
 
 @Component({
   selector: 'app-reservations',
@@ -16,6 +17,12 @@ export class ReservationsComponent implements OnInit {
   livres: Books[] = [];
   adherents: Users[] = [];
   statutFiltre?: ReservationStatus;
+
+  // Faux pour un Adhérent (User) : pilote le masquage du sélecteur "Adhérent"
+  // (formulaire) et l'absence d'appel à GET /admin/users ci-dessous, pas
+  // seulement l'affichage — cet endpoint est hasRole('Admin') et un compte
+  // User recevrait un 403 rien qu'en le chargeant.
+  estBibliothecaire = false;
 
   chargement = false;
   erreur: string | null = null;
@@ -31,11 +38,20 @@ export class ReservationsComponent implements OnInit {
   // Refus d'annulation (409 RG-05/RG-06), affiché au-dessus de la liste.
   erreurAnnulation: string | null = null;
 
-  constructor(private reservationService: ReservationService) { }
+  constructor(
+    private reservationService: ReservationService,
+    private userAuthService: UserAuthService,
+  ) { }
 
   ngOnInit(): void {
+    this.estBibliothecaire = this.estUtilisateurBibliothecaire();
     this.chargerListesDeReference();
     this.chargerReservations();
+  }
+
+  private estUtilisateurBibliothecaire(): boolean {
+    const roles: any = this.userAuthService.getRoles();
+    return !!roles && roles.some((role: any) => role.roleName === 'Admin');
   }
 
   get reservationsAffichables(): ReservationAffichage[] {
@@ -48,7 +64,12 @@ export class ReservationsComponent implements OnInit {
 
   private chargerListesDeReference() {
     this.reservationService.listerLivres().subscribe(data => this.livres = data);
-    this.reservationService.listerAdherents().subscribe(data => this.adherents = data);
+    // RS-04 : seul un Bibliothécaire choisit l'adhérent, un Adhérent réserve
+    // pour lui-même. GET /admin/users est hasRole('Admin') — jamais appelé
+    // pour un User, pas seulement masqué côté formulaire.
+    if (this.estBibliothecaire) {
+      this.reservationService.listerAdherents().subscribe(data => this.adherents = data);
+    }
   }
 
   chargerReservations() {

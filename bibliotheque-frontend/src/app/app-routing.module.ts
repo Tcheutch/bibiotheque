@@ -26,7 +26,7 @@ const routes: Routes = [
   {path: 'register-user', component: RegistrationComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
   {path: 'user-details/:userId', component: UserDetailsComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
   {path: 'update-user/:userId', component: UpdateUserComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
-  {path: 'reservations', component: ReservationsComponent, canActivate:[AuthGuard], data:{roles:['Admin']}},
+  {path: 'reservations', component: ReservationsComponent, canActivate:[AuthGuard], data:{roles:['Admin','User']}},
   {path: 'login', component: LoginComponent},
   {path: 'forbidden', component: ForbiddenComponent},
   {path: 'borrow-book', component: BorrowBookComponent, canActivate:[AuthGuard], data:{roles:['User']}},

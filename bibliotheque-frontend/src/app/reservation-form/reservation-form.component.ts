@@ -12,6 +12,9 @@ export class ReservationFormComponent implements OnChanges {
 
   @Input() livres: Books[] = [];
   @Input() adherents: Users[] = [];
+  // Faux pour un Adhérent (User) : pas de sélecteur, pas de champ requis —
+  // l'identité vient du token (RS-04), le conteneur pilote via le rôle.
+  @Input() afficherSelecteurAdherent = true;
   // Incrémenté par le conteneur uniquement après un 201 confirmé par le
   // serveur : c'est ce qui déclenche la réinitialisation, jamais le clic
   // sur Réserver lui-même (sinon un 409/400/404 effacerait la sélection
@@ -46,9 +49,13 @@ export class ReservationFormComponent implements OnChanges {
   }
 
   onSubmit() {
-    if (!this.livreId || !this.adherentId) {
+    if (!this.livreId || (this.afficherSelecteurAdherent && !this.adherentId)) {
       return;
     }
-    this.creer.emit({ livreId: this.livreId, adherentId: this.adherentId });
+    this.creer.emit(
+      this.afficherSelecteurAdherent
+        ? { livreId: this.livreId, adherentId: this.adherentId }
+        : { livreId: this.livreId }
+    );
   }
 }

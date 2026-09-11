@@ -11,7 +11,7 @@
             </select>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" *ngIf="afficherSelecteurAdherent">
             <label style="margin-bottom: 10px"> Adhérent </label>
             <select class="form-select" style="margin-bottom: 10px" id="adherentId"
                     [ngModel]="adherentId" (ngModelChange)="onAdherentIdChange($event)" name="adherentId">
@@ -20,7 +20,8 @@
             </select>
         </div>
 
-        <button class="btn btn-success" type="submit" [disabled]="!livreId || !adherentId"> Réserver </button>
+        <button class="btn btn-success" type="submit"
+                [disabled]="!livreId || (afficherSelecteurAdherent && !adherentId)"> Réserver </button>
 
         <div *ngIf="succesVisible" class="alert alert-success mt-2" role="status">
             Réservation créée avec succès.

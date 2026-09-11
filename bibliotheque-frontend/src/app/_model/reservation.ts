@@ -8,7 +8,9 @@ export enum ReservationStatus {
 
 export class ReservationRequest {
     livreId: number;
-    adherentId: number;
+    // Absent pour un Adhérent (User) : l'identité vient du token, pas du
+    // corps de la requête (RS-04). Toujours présent pour un Bibliothécaire.
+    adherentId?: number;
 }
 
 export class Reservation {
