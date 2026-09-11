@@ -4,7 +4,7 @@ import { Books } from '../_model/books';
 import { Reservation, ReservationAffichage, ReservationRequest, ReservationStatus } from '../_model/reservation';
 import { Users } from '../_model/users';
 import { ReservationService } from '../_service/reservation.service';
-import { UserAuthService } from '../_service/user-auth.service';
+import { UsersService } from '../_service/users.service';
 
 @Component({
   selector: 'app-reservations',
@@ -40,18 +40,16 @@ export class ReservationsComponent implements OnInit {
 
   constructor(
     private reservationService: ReservationService,
-    private userAuthService: UserAuthService,
+    private usersService: UsersService,
   ) { }
 
   ngOnInit(): void {
-    this.estBibliothecaire = this.estUtilisateurBibliothecaire();
+    // Même vérification que le reste de l'app (header.component.html) :
+    // évite une seconde implémentation du "qui est Admin" qui pourrait
+    // diverger de celle utilisée ailleurs.
+    this.estBibliothecaire = this.usersService.roleMatch(['Admin']);
     this.chargerListesDeReference();
     this.chargerReservations();
-  }
-
-  private estUtilisateurBibliothecaire(): boolean {
-    const roles: any = this.userAuthService.getRoles();
-    return !!roles && roles.some((role: any) => role.roleName === 'Admin');
   }
 
   get reservationsAffichables(): ReservationAffichage[] {
