@@ -124,7 +124,15 @@ seulement le premier essai`.
 Capture réelle des deux suites (`./mvnw test` et `npx ng test --watch=false
 --browsers=ChromeHeadless`, exécutées juste avant l'ouverture de cette PR) :
 
-![Résultats des tests backend et frontend](screenshots/test-results-securite.png)
+![Résultats des tests backend et frontend](https://raw.githubusercontent.com/Tcheutch/bibiotheque/b8438607065ec376a47deb1f36f66fd5188c9b1a/screenshots/test-results-securite.png)
+
+(Lien absolu épinglé au commit `b843860`, pas un chemin relatif : `gh pr
+create --body-file` colle le texte brut dans le corps de la PR, qui ne
+résout pas les chemins relatifs contre l'arborescence du dépôt — un chemin
+relatif comme `screenshots/xxx.png` ne s'affiche jamais dans un corps de PR
+GitHub, contrairement à un README affiché en navigant le dépôt. C'est ce qui
+n'avait pas été résolu dans la PR #75 : les captures y sont mentionnées par
+leur nom mais jamais réellement intégrées.)
 
 **Backend — 21/21, `BUILD SUCCESS`** (`./mvnw clean test`, PostgreSQL réel) :
 - `ReservationServiceTest` : 12 tests (dont le cas RG-03 manquant ajouté,
