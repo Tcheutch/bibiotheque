@@ -10,6 +10,8 @@ public class ReservationRequest {
     @NotNull(message = "livreId est obligatoire")
     private Integer livreId;
 
-    @NotNull(message = "adherentId est obligatoire")
+    // Obligatoire seulement pour un Bibliothécaire (RS-04) ; ignoré pour un
+    // Adhérent, dont l'identité vient du token. La contrainte dépend du
+    // rôle, donc elle est vérifiée dans ReservationService, pas ici.
     private Integer adherentId;
 }

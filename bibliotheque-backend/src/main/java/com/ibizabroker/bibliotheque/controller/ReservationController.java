@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,6 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.validation.Valid;
 import java.util.List;
 
+// Correspondance de rôles (séance 4) : le sujet parle d'ADHERENT et de
+// BIBLIOTHECAIRE ; ce projet a déjà un système de rôles (Role.roleName =
+// "User"/"Admin", voir AdminController) — appliqué sans nouvelle valeur de
+// rôle ni renommage : ADHERENT = User, BIBLIOTHECAIRE = Admin.
 @RestController
 @RequestMapping("/api/reservations")
 @Tag(name = "Réservations", description = "Gestion des réservations de livres")
@@ -69,6 +74,7 @@ public class ReservationController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Réservation retournée"),
             @ApiResponse(responseCode = "401", description = "Authentification requise"),
+            @ApiResponse(responseCode = "403", description = "Réservation appartenant à un autre adhérent (RS-03)"),
             @ApiResponse(responseCode = "404", description = "Réservation introuvable")
     })
     public ResponseEntity<ReservationResponse> get(@PathVariable Integer id) {
@@ -80,6 +86,7 @@ public class ReservationController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Réservation annulée"),
             @ApiResponse(responseCode = "401", description = "Authentification requise"),
+            @ApiResponse(responseCode = "403", description = "Réservation appartenant à un autre adhérent (RS-05)"),
             @ApiResponse(responseCode = "404", description = "Réservation introuvable"),
             @ApiResponse(responseCode = "409", description = "Règle métier non respectée")
     })
@@ -87,11 +94,13 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.cancel(id));
     }
 
+    @PreAuthorize("hasRole('Admin')")
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer une réservation")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Réservation supprimée"),
             @ApiResponse(responseCode = "401", description = "Authentification requise"),
+            @ApiResponse(responseCode = "403", description = "Réservé au Bibliothécaire (RS-02)"),
             @ApiResponse(responseCode = "404", description = "Réservation introuvable")
     })
     public ResponseEntity<Void> delete(@PathVariable Integer id) {

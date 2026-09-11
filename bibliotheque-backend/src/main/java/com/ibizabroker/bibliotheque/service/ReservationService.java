@@ -11,14 +11,18 @@ import com.ibizabroker.bibliotheque.entity.ReservationStatus;
 import com.ibizabroker.bibliotheque.entity.Users;
 import com.ibizabroker.bibliotheque.exceptions.BusinessRuleException;
 import com.ibizabroker.bibliotheque.exceptions.NotFoundException;
+import com.ibizabroker.bibliotheque.exceptions.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -39,15 +43,20 @@ public class ReservationService {
     @Autowired
     private UsersRepository usersRepository;
 
+    @Autowired
+    private CurrentUserService currentUserService;
+
     @Transactional
     public ReservationResponse create(ReservationRequest request) {
+        Integer adherentId = resolveAdherentId(request);
+
         Books livre = booksRepository.findByIdForUpdate(request.getLivreId())
                 .orElseThrow(() -> new NotFoundException(
                         "Livre avec l'identifiant " + request.getLivreId() + " introuvable."
                 ));
-        Users adherent = usersRepository.findByIdForUpdate(request.getAdherentId())
+        Users adherent = usersRepository.findByIdForUpdate(adherentId)
                 .orElseThrow(() -> new NotFoundException(
-                        "Adhérent avec l'identifiant " + request.getAdherentId() + " introuvable."
+                        "Adhérent avec l'identifiant " + adherentId + " introuvable."
                 ));
 
         // RG-01 : noOfCopies reflète le nombre d'exemplaires actuellement disponibles
@@ -91,15 +100,22 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> list(ReservationStatus statut, Integer adherentId) {
+        // RS-03 : un Adhérent ne peut lister que ses propres réservations,
+        // quel que soit le adherentId demandé en paramètre — écrasé ici,
+        // filtré silencieusement, jamais un refus 403 sur la liste.
+        Integer adherentEffectif = currentUserService.isAdmin()
+                ? adherentId
+                : currentUserService.getCurrentUser().getUserId();
+
         List<Reservation> reservations;
-        if (statut != null && adherentId != null) {
+        if (statut != null && adherentEffectif != null) {
             reservations = reservationRepository
-                    .findByStatutAndAdherentUserIdOrderByDateReservationAsc(statut, adherentId);
+                    .findByStatutAndAdherentUserIdOrderByDateReservationAsc(statut, adherentEffectif);
         } else if (statut != null) {
             reservations = reservationRepository.findByStatutOrderByDateReservationAsc(statut);
-        } else if (adherentId != null) {
+        } else if (adherentEffectif != null) {
             reservations = reservationRepository
-                    .findByAdherentUserIdOrderByDateReservationAsc(adherentId);
+                    .findByAdherentUserIdOrderByDateReservationAsc(adherentEffectif);
         } else {
             reservations = reservationRepository.findAllByOrderByDateReservationAsc();
         }
@@ -111,14 +127,17 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public ReservationResponse get(Integer id) {
-        return toResponse(reservationRepository.findById(id)
-                .orElseThrow(() -> reservationNotFound(id)));
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> reservationNotFound(id));
+        assertOwnerOrAdmin(reservation);
+        return toResponse(reservation);
     }
 
     @Transactional
     public ReservationResponse cancel(Integer id) {
         Reservation reservation = reservationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> reservationNotFound(id));
+        assertOwnerOrAdmin(reservation);
 
         if (!ACTIVE_STATUSES.contains(reservation.getStatut())) {
             throw new BusinessRuleException(
@@ -143,6 +162,36 @@ public class ReservationService {
         return new NotFoundException(
                 "Réservation avec l'identifiant " + id + " introuvable."
         );
+    }
+
+    // RS-04 : un Bibliothécaire (Admin) réserve pour l'adherentId fourni
+    // dans le corps ; un Adhérent (User) réserve pour lui-même, le corps
+    // est ignoré pour ce champ — l'identité vient exclusivement du token.
+    private Integer resolveAdherentId(ReservationRequest request) {
+        if (!currentUserService.isAdmin()) {
+            return currentUserService.getCurrentUser().getUserId();
+        }
+        if (request.getAdherentId() == null) {
+            Map<String, String> erreurs = new LinkedHashMap<>();
+            erreurs.put("adherentId", "adherentId est obligatoire");
+            throw new ValidationException("Validation échouée.", erreurs);
+        }
+        return request.getAdherentId();
+    }
+
+    // RS-03/RS-05 : un Adhérent ne peut consulter ou annuler que ses
+    // propres réservations ; un Bibliothécaire n'a aucune restriction.
+    // Seul point de contrôle de propriété, réutilisé par get() et cancel().
+    private void assertOwnerOrAdmin(Reservation reservation) {
+        if (currentUserService.isAdmin()) {
+            return;
+        }
+        Integer idAppelant = currentUserService.getCurrentUser().getUserId();
+        if (!idAppelant.equals(reservation.getAdherent().getUserId())) {
+            throw new AccessDeniedException(
+                    "Vous ne pouvez consulter ou annuler que vos propres réservations."
+            );
+        }
     }
 
     private ReservationResponse toResponse(Reservation reservation) {
