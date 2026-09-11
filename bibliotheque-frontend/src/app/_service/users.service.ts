@@ -27,23 +27,16 @@ export class UsersService {
   }
 
   public roleMatch(allowedRoles: any): boolean {
-    let isMatch = false;
-    const userRoles: any = this.userAuthService.getRoles();
-
-    if (userRoles != null && userRoles) {
-      for (let i = 0; i < userRoles.length; i++) {
-        for (let j = 0; j < allowedRoles.length; j++) {
-          if (userRoles[i].roleName === allowedRoles[j]) {
-            isMatch = true;
-            return isMatch;
-          } else {
-            return isMatch;
-          }
-        }
-      }
+    // route.data["roles"] n'est garanti tableau que par convention (cast
+    // "as Array<string>", non vérifié à l'exécution) : garde défensive.
+    if (!Array.isArray(allowedRoles)) {
+      return false;
     }
-
-    return false;
+    const userRoles: any = this.userAuthService.getRoles();
+    if (!userRoles) {
+      return false;
+    }
+    return userRoles.some((userRole: any) => allowedRoles.includes(userRole.roleName));
   }
 
   getUsersList(): Observable<Users[]> {
