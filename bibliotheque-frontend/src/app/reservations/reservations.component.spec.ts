@@ -13,6 +13,12 @@ describe('ReservationsComponent', () => {
   const RESERVATIONS_URL = 'http://localhost:8080/api/reservations';
 
   beforeEach(async () => {
+    // Tous les tests de ce bloc portent sur le comportement Bibliothécaire
+    // (Admin) : sélecteur Adhérent affiché, adherentId toujours envoyé —
+    // comportement inchangé depuis la séance 3. Le rôle Adhérent (User) a
+    // son propre bloc plus bas (pas d'appel /admin/users, pas d'adherentId).
+    localStorage.setItem('roles', JSON.stringify([{ roleId: 1, roleName: 'Admin' }]));
+
     await TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       declarations: [ ReservationsComponent ],
@@ -34,6 +40,7 @@ describe('ReservationsComponent', () => {
 
   afterEach(() => {
     httpMock.verify();
+    localStorage.removeItem('roles');
   });
 
   it('should create', () => {
@@ -347,5 +354,48 @@ describe('ReservationsComponent', () => {
 
       expect(window.alert).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('ReservationsComponent — rôle Adhérent (User)', () => {
+  let component: ReservationsComponent;
+  let fixture: ComponentFixture<ReservationsComponent>;
+  let httpMock: HttpTestingController;
+
+  const RESERVATIONS_URL = 'http://localhost:8080/api/reservations';
+
+  beforeEach(async () => {
+    localStorage.setItem('roles', JSON.stringify([{ roleId: 2, roleName: 'User' }]));
+
+    await TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      declarations: [ ReservationsComponent ],
+      schemas: [NO_ERRORS_SCHEMA]
+    })
+    .compileComponents();
+
+    fixture = TestBed.createComponent(ReservationsComponent);
+    component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+
+    // Contrairement au bloc Bibliothécaire ci-dessus : pas de GET
+    // /admin/users à solder ici, il ne doit jamais être émis (RS-04).
+    httpMock.expectOne('http://localhost:8080/admin/books').flush([]);
+    httpMock.expectOne(r => r.url === RESERVATIONS_URL).flush([]);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.removeItem('roles');
+  });
+
+  it("n'appelle jamais GET /admin/users (pas seulement masqué côté formulaire)", () => {
+    httpMock.expectNone('http://localhost:8080/admin/users');
+  });
+
+  it('estBibliothecaire est faux, adherents reste vide', () => {
+    expect(component.estBibliothecaire).toBeFalse();
+    expect(component.adherents).toEqual([]);
   });
 });

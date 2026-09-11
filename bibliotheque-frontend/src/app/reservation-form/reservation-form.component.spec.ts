@@ -127,4 +127,36 @@ describe('ReservationFormComponent', () => {
       expect(bloc.querySelector('ul')).toBeNull();
     });
   });
+
+  describe('rôle Adhérent (afficherSelecteurAdherent = false)', () => {
+
+    beforeEach(() => {
+      component.afficherSelecteurAdherent = false;
+      fixture.detectChanges();
+    });
+
+    it('masque le sélecteur "Adhérent" (absent du DOM, pas seulement caché)', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('#adherentId')).toBeNull();
+    });
+
+    it("n'émet rien tant que livreId n'est pas renseigné (adherentId non requis)", () => {
+      spyOn(component.creer, 'emit');
+
+      component.livreId = undefined;
+      component.onSubmit();
+
+      expect(component.creer.emit).not.toHaveBeenCalled();
+    });
+
+    it('émet uniquement livreId, sans adherentId, une fois livreId renseigné', () => {
+      spyOn(component.creer, 'emit');
+
+      component.livreId = 1;
+      component.adherentId = undefined;
+      component.onSubmit();
+
+      expect(component.creer.emit).toHaveBeenCalledWith({ livreId: 1 });
+    });
+  });
 });
