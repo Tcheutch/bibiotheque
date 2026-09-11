@@ -172,6 +172,38 @@ Comptes et données de test supprimés après vérification (`e2e_sec_user1`/
 données de démonstration préparé séparément pour le passage devant le
 formateur.
 
+## Revue `/code-review ultra` sur l'ensemble de la branche
+
+Lancée avant le push, sur toute la branche (vs `main`, 66 fichiers). Trois
+remontées :
+
+1. **Corrigé** — `header.component.html:28` gardait le lien de navigation
+   "Réservations" sur `roleMatch(['Admin'])` seul, alors que la route
+   (`app-routing.module.ts:29`) et l'écran servent désormais aussi les
+   Adhérents : sans ce correctif, un `User` authentifié n'avait **aucun
+   moyen de découvrir l'écran depuis l'UI** (URL à taper à la main). Passé à
+   `roleMatch(['Admin','User'])`. Ce point avait échappé à la vérification
+   empirique du §6.3 parce que le scénario navigue directement vers l'URL
+   (`page.goto(...)`), sans jamais passer par le lien de menu — reconfirmé
+   après correctif avec un compte de test jetable, cliquant réellement sur
+   le lien.
+2. **Corrigé** — `ReservationsComponent.estUtilisateurBibliothecaire()`
+   réimplémentait la même logique que `UsersService.roleMatch(['Admin'])`,
+   déjà utilisée partout ailleurs dans l'app : deux implémentations
+   indépendantes de "qui est Admin" qui auraient pu diverger silencieusement
+   — exactement le risque que le point précédent vient d'illustrer.
+   Remplacé par un appel direct à `roleMatch(['Admin'])`.
+3. **Signalé, non corrigé** — `BorrowRepository.existsByBookIdAndReturnDateIsNull`
+   n'a aucun appelant dans tout le dépôt. Vérifié : cette méthode vient du
+   commit `93e2f46` (séance 3, module Réservation initial), **avant** le
+   point de départ de cette branche — `git diff feature/reservation-ui-...
+   ...HEAD -- .../BorrowRepository.java` est vide, ce fichier n'a jamais été
+   touché ici. Dette préexistante de la branche parente, hors périmètre de
+   cette PR, non corrigée sans accord explicite.
+
+Suite Karma après les deux correctifs : 19 FAILED (identiques), 67 SUCCESS,
+86 total — inchangé.
+
 ## Points d'attention pour la revue (hors périmètre, non corrigés aujourd'hui)
 
 - `role_name = 'User'` existe en double en base (`role_id` 2 et 3) —
