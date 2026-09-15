@@ -1,7 +1,8 @@
 <div class="container col-md-6 offset-mid-3">
-<form autocomplete="off" #loginForm="ngForm" (ngSubmit)="login(loginForm)">
+<form autocomplete="off" #loginForm="ngForm" (ngSubmit)="login(loginForm)" style="margin-top: 100px;">
+    <div class="alert alert-warning" role="alert" *ngIf="messageSession">{{ messageSession }}</div>
     <div class="mb-3">
-      <label class="form-label" style="margin-top: 100px;">Username</label>
+      <label class="form-label">Username</label>
       <input type="text" name="username" ngModel class="form-control" id="loginUsername" placeholder="Enter your username">
       <div id="emailHelp" class="form-text">Username provided by the library admin.</div>
     </div>

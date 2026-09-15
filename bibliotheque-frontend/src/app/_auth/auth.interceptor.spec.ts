@@ -3,12 +3,14 @@ import { HttpClient, HttpErrorResponse, HTTP_INTERCEPTORS } from '@angular/commo
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 
+import { UserAuthService } from '../_service/user-auth.service';
 import { AuthInterceptor } from './auth.interceptor';
 
 describe('AuthInterceptor', () => {
   let httpClient: HttpClient;
   let httpMock: HttpTestingController;
   let router: jasmine.SpyObj<Router>;
+  let userAuthService: UserAuthService;
 
   beforeEach(() => {
     const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
@@ -24,13 +26,32 @@ describe('AuthInterceptor', () => {
     httpClient = TestBed.inject(HttpClient);
     httpMock = TestBed.inject(HttpTestingController);
     router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    userAuthService = TestBed.inject(UserAuthService);
+    spyOn(userAuthService, 'clear');
   });
 
   afterEach(() => {
     httpMock.verify();
   });
 
-  it('redirige vers /login sur une erreur 401', () => {
+  it('sur un 401, vide la session et redirige vers /login avec le message du serveur tel quel', () => {
+    httpClient.get('/test').subscribe({
+      next: () => fail('la requête aurait dû échouer'),
+      error: () => {},
+    });
+
+    httpMock.expectOne('/test').flush(
+      { message: 'Votre session a expiré. Veuillez vous reconnecter.', errors: {} },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    expect(userAuthService.clear).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/login'], { state: { message: 'Votre session a expiré. Veuillez vous reconnecter.' } }
+    );
+  });
+
+  it('sur un 401 sans message exploitable, redirige vers /login avec un message de repli', () => {
     httpClient.get('/test').subscribe({
       next: () => fail('la requête aurait dû échouer'),
       error: () => {},
@@ -38,7 +59,10 @@ describe('AuthInterceptor', () => {
 
     httpMock.expectOne('/test').flush('Non autorisé', { status: 401, statusText: 'Unauthorized' });
 
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(userAuthService.clear).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/login'], { state: { message: "Votre session n'est plus valide. Veuillez vous reconnecter." } }
+    );
   });
 
   it('redirige vers /forbidden sur une erreur 403', () => {
@@ -50,6 +74,7 @@ describe('AuthInterceptor', () => {
     httpMock.expectOne('/test').flush('Interdit', { status: 403, statusText: 'Forbidden' });
 
     expect(router.navigate).toHaveBeenCalledWith(['/forbidden']);
+    expect(userAuthService.clear).not.toHaveBeenCalled();
   });
 
   it('relance le HttpErrorResponse d\'origine pour un 409, sans le remplacer par un message générique', () => {

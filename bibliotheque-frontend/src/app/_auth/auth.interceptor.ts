@@ -5,6 +5,8 @@ import { Observable, throwError } from 'rxjs';
 import { UserAuthService } from '../_service/user-auth.service';
 import { Injectable } from '@angular/core';
 
+const MESSAGE_SESSION_PAR_DEFAUT = "Votre session n'est plus valide. Veuillez vous reconnecter.";
+
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
   constructor(
@@ -26,7 +28,12 @@ export class AuthInterceptor implements HttpInterceptor {
             (err:HttpErrorResponse) => {
                 console.log(err.status);
                 if(err.status === 401) {
-                    this.router.navigate(['/login']);
+                    // Token absent, invalide ou expiré : la session locale n'est plus
+                    // utilisable. On la vide (sinon AuthGuard laisserait encore passer)
+                    // et on transmet à /login le message du serveur tel quel
+                    // (ex. "Votre session a expiré..."), pour qu'il y soit affiché.
+                    this.userAuthService.clear();
+                    this.router.navigate(['/login'], { state: { message: this.messageSession(err) } });
                 } else if(err.status === 403) {
                     this.router.navigate(['/forbidden']);
                 }
@@ -37,6 +44,13 @@ export class AuthInterceptor implements HttpInterceptor {
             }
         )
     );
+  }
+
+  private messageSession(err: HttpErrorResponse): string {
+      const message = err.error?.message;
+      return typeof message === 'string' && message.trim() !== ''
+          ? message
+          : MESSAGE_SESSION_PAR_DEFAUT;
   }
 
   private addToken(request:HttpRequest<any>, token:string) {

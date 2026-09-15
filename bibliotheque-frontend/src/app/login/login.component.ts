@@ -11,10 +11,17 @@ import { UsersService } from '../_service/users.service';
 })
 export class LoginComponent implements OnInit {
 
+  // Message posé par AuthInterceptor lors d'une redirection sur 401 (ex. session
+  // expirée), affiché tel quel. Lu sur la navigation en cours : il disparaît si
+  // l'on recharge /login, ce qui est voulu.
+  messageSession: string | null = null;
+
   constructor(private userService: UsersService,
     private userAuthSerivce: UserAuthService,
     private router: Router
-  ) { }
+  ) {
+    this.messageSession = this.router.getCurrentNavigation()?.extras.state?.['message'] ?? null;
+  }
 
   ngOnInit() {
   }
