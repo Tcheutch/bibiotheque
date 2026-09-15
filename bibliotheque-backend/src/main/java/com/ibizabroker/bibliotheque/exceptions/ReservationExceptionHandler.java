@@ -1,7 +1,9 @@
 package com.ibizabroker.bibliotheque.exceptions;
 
+import com.ibizabroker.bibliotheque.configuration.SecurityAuditLogger;
 import com.ibizabroker.bibliotheque.controller.ReservationController;
 import com.ibizabroker.bibliotheque.dto.ApiError;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -19,6 +21,9 @@ import java.util.Map;
 
 @RestControllerAdvice(assignableTypes = ReservationController.class)
 public class ReservationExceptionHandler {
+
+    @Autowired
+    private SecurityAuditLogger securityAuditLogger;
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(
@@ -84,6 +89,7 @@ public class ReservationExceptionHandler {
             AccessDeniedException exception,
             HttpServletRequest request
     ) {
+        securityAuditLogger.refus(request, HttpStatus.FORBIDDEN.value(), exception.getMessage());
         return build(HttpStatus.FORBIDDEN, exception.getMessage(), request, new LinkedHashMap<>());
     }
 

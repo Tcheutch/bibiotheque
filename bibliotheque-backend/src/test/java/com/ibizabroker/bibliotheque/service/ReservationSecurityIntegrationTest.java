@@ -8,11 +8,17 @@ import com.ibizabroker.bibliotheque.entity.Reservation;
 import com.ibizabroker.bibliotheque.entity.ReservationStatus;
 import com.ibizabroker.bibliotheque.entity.Role;
 import com.ibizabroker.bibliotheque.entity.Users;
+import com.ibizabroker.bibliotheque.util.JwtUtil;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -21,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,11 +35,13 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 // supprimées directement (comme scripts/reservation/*.sql), pas via un
 // rollback de test.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ExtendWith(OutputCaptureExtension.class)
 class ReservationSecurityIntegrationTest {
 
     private static final String RAW_PASSWORD = "Test1234!";
@@ -135,6 +145,8 @@ class ReservationSecurityIntegrationTest {
         ResponseEntity<String> response = restTemplate.getForEntity("/api/reservations", String.class);
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().contains("Authentification requise"), response.getBody());
     }
 
     @Test
@@ -220,6 +232,72 @@ class ReservationSecurityIntegrationTest {
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
     }
 
+    // Expiration du token : toujours un 401 (RS-01), mais avec un message qui
+    // dit pourquoi — distinct du token absent et du token invalide — pour que
+    // l'écran de connexion puisse l'afficher tel quel.
+    @Test
+    void listWithExpiredToken_shouldReturn401WithSessionExpiredMessage() {
+        String tokenExpire = tokenExpirePour(adherentA.getUsername());
+
+        ResponseEntity<String> response = get("/api/reservations", tokenExpire);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().contains("Votre session a expiré"), response.getBody());
+    }
+
+    @Test
+    void listWithMalformedToken_shouldReturn401WithInvalidTokenMessage() {
+        ResponseEntity<String> response = get("/api/reservations", "pas.un.jwt");
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().contains("Token invalide"), response.getBody());
+    }
+
+    // Journalisation des refus : chaque 401/403 laisse une ligne WARN
+    // "ACCES_REFUSE" (statut, méthode, chemin, IP, utilisateur, raison),
+    // jamais le token lui-même.
+    @Test
+    void expiredTokenRefusal_shouldBeLoggedAs401WithReasonButNeverTheToken(CapturedOutput output) {
+        String tokenExpire = tokenExpirePour(adherentA.getUsername());
+
+        get("/api/reservations", tokenExpire);
+
+        String ligne = ligneAccesRefuse(output, "status=401");
+        assertTrue(ligne.contains("methode=GET"), ligne);
+        assertTrue(ligne.contains("chemin=/api/reservations"), ligne);
+        assertTrue(ligne.contains("utilisateur=anonyme"), ligne);
+        assertTrue(ligne.contains("TOKEN_EXPIRE"), ligne);
+        assertFalse(output.getOut().contains(tokenExpire), "le token ne doit jamais être journalisé");
+    }
+
+    @Test
+    void accessToSomeoneElsesReservation_shouldBeLoggedAs403WithCallerUsername(CapturedOutput output) {
+        String tokenB = authenticate(adherentB.getUsername());
+
+        get("/api/reservations/" + reservationDeA.getId(), tokenB);
+
+        String ligne = ligneAccesRefuse(output, "status=403");
+        assertTrue(ligne.contains("utilisateur=" + adherentB.getUsername()), ligne);
+        assertTrue(ligne.contains("chemin=/api/reservations/" + reservationDeA.getId()), ligne);
+    }
+
+    // Hors module Réservation : un 403 de @PreAuthorize sur AdminController
+    // passe par JwtAccessDeniedHandler (pas de @RestControllerAdvice dédié),
+    // qui doit journaliser de la même façon.
+    @Test
+    void adminEndpointWithUserToken_shouldReturn403AndBeLogged(CapturedOutput output) {
+        String tokenB = authenticate(adherentB.getUsername());
+
+        ResponseEntity<String> response = get("/admin/users", tokenB);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        String ligne = ligneAccesRefuse(output, "status=403");
+        assertTrue(ligne.contains("chemin=/admin/users"), ligne);
+        assertTrue(ligne.contains("utilisateur=" + adherentB.getUsername()), ligne);
+    }
+
     // Le fetch du rôle et la sauvegarde de l'utilisateur doivent partager la
     // même transaction : sinon le Role revient détaché entre les deux (pas
     // de transaction ambiante ici), et le cascade PERSIST de Users.role
@@ -265,5 +343,26 @@ class ReservationSecurityIntegrationTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         return restTemplate.exchange(path, HttpMethod.DELETE, new HttpEntity<>(headers), String.class);
+    }
+
+    // Même signature que JwtUtil.generateToken (HS512, même clé), mais déjà
+    // expiré. La clé est lue par réflexion plutôt que recopiée ici, pour ne
+    // pas diverger si elle change.
+    private String tokenExpirePour(String username) {
+        String cle = (String) ReflectionTestUtils.getField(JwtUtil.class, "SECRET_KEY");
+        long maintenant = System.currentTimeMillis();
+        return Jwts.builder()
+                .setSubject(username)
+                .setIssuedAt(new Date(maintenant - 7_200_000))
+                .setExpiration(new Date(maintenant - 3_600_000))
+                .signWith(SignatureAlgorithm.HS512, cle)
+                .compact();
+    }
+
+    private static String ligneAccesRefuse(CapturedOutput output, String statut) {
+        return output.getOut().lines()
+                .filter(ligne -> ligne.contains("ACCES_REFUSE") && ligne.contains(statut))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("aucune ligne ACCES_REFUSE " + statut + " journalisée"));
     }
 }

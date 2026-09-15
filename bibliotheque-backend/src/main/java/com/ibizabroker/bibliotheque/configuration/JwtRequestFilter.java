@@ -2,7 +2,9 @@ package com.ibizabroker.bibliotheque.configuration;
 
 import com.ibizabroker.bibliotheque.service.JwtService;
 import com.ibizabroker.bibliotheque.util.JwtUtil;
+import com.ibizabroker.bibliotheque.configuration.JwtAuthenticationEntryPoint.MotifNonAuthentifie;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,15 +38,16 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
             jwtToken = requestTokenHeader.substring(7);
+            // Token inutilisable : pas de refus ici, la requête continue sans
+            // authentification (un endpoint public reste accessible). Si l'endpoint
+            // est protégé, JwtAuthenticationEntryPoint lit ce motif pour le 401.
             try {
                 username = jwtUtil.getUsernameFromToken(jwtToken);
-            } catch (IllegalArgumentException e) {
-                System.out.println("Unable to get JWT Token");
             } catch (ExpiredJwtException e) {
-                System.out.println("JWT Token has expired");
+                request.setAttribute(JwtAuthenticationEntryPoint.ATTRIBUT_MOTIF, MotifNonAuthentifie.TOKEN_EXPIRE);
+            } catch (JwtException | IllegalArgumentException e) {
+                request.setAttribute(JwtAuthenticationEntryPoint.ATTRIBUT_MOTIF, MotifNonAuthentifie.TOKEN_INVALIDE);
             }
-        } else {
-            System.out.println("JWT token does not start with Bearer");
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
