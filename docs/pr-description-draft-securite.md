@@ -14,6 +14,12 @@ l'utiliser (sélecteur "Adhérent" retiré, pas seulement caché). Corrige au
 passage un bug préexistant de `roleMatch()` (paragraphe dédié plus bas),
 révélé par ce travail sans en faire partie.
 
+Traite aussi les trois points « Si vous finissez en avance » (section
+dédiée plus bas) : message explicite sur un token expiré, de bout en bout
+(backend + écran de connexion) ; journalisation des accès refusés
+(401/403) ; le test sur RG-01 existait déjà depuis la séance 3, il est cité
+avec sa preuve.
+
 ## Correspondance de rôles (rappel explicite)
 
 Le sujet de la séance utilise `ADHERENT` et `BIBLIOTHECAIRE` ; ce projet a
@@ -102,7 +108,8 @@ seulement le premier essai`.
   unique. Confirmé par `getOwnReservationWithUserToken_shouldReturn200()`
   et `getSomeoneElsesReservationWithUserToken_shouldReturn403()`.
 - **Distinction 401/403** — `JwtAuthenticationEntryPoint` (401, pas de
-  token/token invalide) et `JwtAccessDeniedHandler` (403, câblé dans
+  token, token invalide ou expiré — message propre à chaque cas depuis les
+  ajouts « en avance », voir plus bas) et `JwtAccessDeniedHandler` (403, câblé dans
   `WebSecurityConfiguration.java:58-59`) sont deux composants distincts.
   **Précision empirique** (corps de réponse observé sur le 403 de `DELETE`
   par un `User` : `{"timestamp":...,"status":403,"message":"Access is
@@ -119,14 +126,111 @@ seulement le premier essai`.
   forme de corps doit regarder `ReservationExceptionHandler`, pas
   `JwtAccessDeniedHandler`.
 
+## « Si vous finissez en avance » — les trois points
+
+### Expiration du token et message associé
+
+- **Backend** — `JwtRequestFilter.java:46-49` : un token expiré
+  (`ExpiredJwtException`) ou invalide (toute autre `JwtException`) ne
+  produit plus un simple `System.out.println`. Le filtre pose le motif
+  (`TOKEN_EXPIRE` / `TOKEN_INVALIDE`) en attribut de requête et laisse la
+  requête continuer sans authentification : un endpoint public reste
+  accessible (vérifié : `/borrow` répond 200 avec un token malformé).
+  `JwtAuthenticationEntryPoint.java:28,47-65` renvoie alors un
+  401 au format `ApiError`, avec un message qui dit pourquoi :
+  - token expiré : « Votre session a expiré. Veuillez vous reconnecter. »
+  - token invalide : « Token invalide. Veuillez vous reconnecter. »
+  - pas de token : « Authentification requise. Veuillez vous connecter. »
+
+  Avant : le même `sendError(401, "Unauthorized")` dans les trois cas, sans
+  message exploitable côté client.
+- **Frontend** — sur un 401, `auth.interceptor.ts:30-36` vide la session
+  locale (sinon `AuthGuard` laisserait encore passer avec le token expiré
+  resté dans le `localStorage`) et redirige vers `/login` en transmettant
+  le message du serveur tel quel dans l'état de navigation, avec un message
+  de repli si le corps n'en contient pas (`auth.interceptor.ts:8,49`).
+  `LoginComponent` le lit sur la navigation en cours
+  (`login.component.ts:17,23`) et l'affiche dans une alerte
+  (`login.component.html:3`). Le 403 et la propagation du
+  `HttpErrorResponse` d'origine sont inchangés.
+- **Preuve** — backend :
+  `listWithExpiredToken_shouldReturn401WithSessionExpiredMessage` (token
+  signé avec la vraie clé mais déjà expiré),
+  `listWithMalformedToken_shouldReturn401WithInvalidTokenMessage`, et
+  `listWithoutToken_shouldReturn401`, qui vérifie maintenant aussi le
+  message. Frontend : 2 tests d'intercepteur (message du serveur ou message
+  de repli, session vidée dans les deux cas) et 2 tests `LoginComponent`
+  (alerte affichée, pas d'alerte sans message). **Vérifié aussi sur un
+  backend démarré** (`curl` avec `Origin: http://localhost:4200`) : le 401
+  porte `Access-Control-Allow-Origin` et le JSON du message. Sans cet
+  en-tête, le navigateur n'aurait pas laissé l'écran lire le message.
+- **Limite assumée** — rien ne se déclenche à l'instant exact de
+  l'expiration (token valable 5 h, `JwtUtil.java:19`) : le message
+  apparaît à la requête suivante vers l'API.
+
+### Test sur RG-01 (réservation d'un livre disponible)
+
+**Déjà présent avant cette branche, pas ajouté ici.**
+`rg01ShouldRejectBookWithAvailableCopies` (`ReservationServiceTest`,
+repository simulé) et `rg01ShouldRejectAvailableBookWithoutActiveBorrow`
+(`ReservationIntegrationTest`, PostgreSQL réel) vérifient qu'un livre
+disponible est refusé avec `RG-01` et que rien n'est enregistré. Deux cas
+multi-exemplaires les complètent dans `ReservationServiceTest` (une copie
+restante → refus ; plus aucune copie → réservation acceptée). Introduits en
+séance 3 (commits `93e2f46` et `ae91741`), toujours verts : 4/4 relancés
+isolément, et inclus dans le 26/26 ci-dessous.
+
+### Journalisation des tentatives d'accès refusées
+
+Nouveau `SecurityAuditLogger` (`SecurityAuditLogger.java:22`) : une ligne
+`WARN` par refus, au format clé=valeur, **sans jamais le token**. Il est
+appelé par les trois seuls points qui produisent un refus :
+`JwtAuthenticationEntryPoint` (401), `JwtAccessDeniedHandler` (403 hors
+Réservation, `JwtAccessDeniedHandler.java:24`) et
+`ReservationExceptionHandler` (403 Réservation,
+`ReservationExceptionHandler.java:92`). Les retours à la ligne sont
+neutralisés dans les valeurs, pour qu'un chemin forgé ne puisse pas injecter
+de fausses lignes. Lignes réelles relevées pendant les tests :
+
+```
+ACCES_REFUSE status=401 methode=GET chemin=/api/reservations ip=127.0.0.1 utilisateur=anonyme motif="TOKEN_EXPIRE"
+ACCES_REFUSE status=403 methode=GET chemin=/api/reservations/112 ip=127.0.0.1 utilisateur=it_sec_a2_7213239477496 motif="Vous ne pouvez consulter ou annuler que vos propres réservations."
+ACCES_REFUSE status=403 methode=GET chemin=/admin/users ip=127.0.0.1 utilisateur=it_sec_a2_7214364532054 motif="Access is denied"
+```
+
+Preuve : trois tests lisent la sortie réelle via `OutputCaptureExtension`.
+`expiredTokenRefusal_shouldBeLoggedAs401WithReasonButNeverTheToken` vérifie
+aussi que le token n'apparaît nulle part dans la sortie.
+`accessToSomeoneElsesReservation_shouldBeLoggedAs403WithCallerUsername`
+couvre le 403 Réservation, et
+`adminEndpointWithUserToken_shouldReturn403AndBeLogged` le chemin
+`JwtAccessDeniedHandler`. Pour un 401, le journal indique
+`utilisateur=anonyme` : l'identité contenue dans un token expiré n'est pas
+reprise.
+
+### Fichiers partagés modifiés hors du module Réservation
+
+Même traitement que `auth.interceptor.ts` (séance 3) et `roleMatch()`
+(ci-dessus) : signalés en évidence. Backend : `JwtRequestFilter`,
+`JwtAuthenticationEntryPoint`, `JwtAccessDeniedHandler`. Frontend :
+`auth.interceptor.ts`, `login.component.*`. Effet sur toute l'application :
+tout 401 porte désormais un message et vide la session locale côté
+frontend. Les 403 hors Réservation gardent leur corps par défaut ; seule la
+journalisation s'y ajoute.
+
+Commits séparés : `9abb5e3 feat(securite): 401 explicite sur token
+expiré/invalide et journalisation des refus` (backend) et `7a8fd9a
+feat(auth-ui): affiche le motif du 401 sur l'écran de connexion` (frontend).
+
 ## Résultats de tests
 
-Capture réelle des deux suites (`./mvnw test` et `npx ng test --watch=false
---browsers=ChromeHeadless`, exécutées juste avant l'ouverture de cette PR) :
+Capture réelle des deux suites (`./mvnw clean test` et `npx ng test
+--watch=false --browsers=ChromeHeadless`), exécutées après les ajouts « en
+avance » :
 
-![Résultats des tests backend et frontend](https://raw.githubusercontent.com/Tcheutch/bibiotheque/b8438607065ec376a47deb1f36f66fd5188c9b1a/screenshots/test-results-securite.png)
+![Résultats des tests backend et frontend](https://raw.githubusercontent.com/Tcheutch/bibiotheque/762e2e1268f508713b3c118289ee27c0a41fa755/screenshots/test-results-securite.png)
 
-(Lien absolu épinglé au commit `b843860`, pas un chemin relatif : `gh pr
+(Lien absolu épinglé au commit `762e2e1`, qui met à jour la capture, pas un chemin relatif : `gh pr
 create --body-file` colle le texte brut dans le corps de la PR, qui ne
 résout pas les chemins relatifs contre l'arborescence du dépôt — un chemin
 relatif comme `screenshots/xxx.png` ne s'affiche jamais dans un corps de PR
@@ -134,27 +238,37 @@ GitHub, contrairement à un README affiché en navigant le dépôt. C'est ce qui
 n'avait pas été résolu dans la PR #75 : les captures y sont mentionnées par
 leur nom mais jamais réellement intégrées.)
 
-**Backend — 21/21, `BUILD SUCCESS`** (`./mvnw clean test`, PostgreSQL réel) :
-- `ReservationServiceTest` : 12 tests (dont le cas RG-03 manquant ajouté,
+**Backend — 26/26, `BUILD SUCCESS`** (`./mvnw clean test`, PostgreSQL réel) :
+- `ReservationServiceTest` : 11 tests (dont le cas RG-03 manquant ajouté,
   2 actives → succès, sans toucher au cas 3 actives → refus déjà présent).
 - `ReservationIntegrationTest` : 2 tests (RG-01/RG-04, service direct).
-- `ReservationSecurityIntegrationTest` : 7 tests, **vrai flux HTTP**
+- `ReservationSecurityIntegrationTest` : 12 tests, **vrai flux HTTP**
   (`TestRestTemplate`, port réel, `POST /authenticate` réel, chaîne de
-  sécurité non mockée) : 401 sans token, 200 + filtrage silencieux avec
-  token Adhérent, 200 sur sa propre réservation, 403 sur celle d'un autre,
-  403/204 sur `DELETE` (Adhérent/Bibliothécaire), 400 nommant le champ
-  `adherentId` manquant.
+  sécurité non mockée) : 401 sans token (avec son message), 200 + filtrage
+  silencieux avec token Adhérent, 200 sur sa propre réservation, 403 sur
+  celle d'un autre, 403/204 sur `DELETE` (Adhérent/Bibliothécaire), 400
+  nommant le champ `adherentId` manquant. **Ajouts « en avance »** : 401 +
+  message sur token expiré et sur token malformé, et trois vérifications du
+  journal `ACCES_REFUSE` (401 token expiré, 403 sur la réservation d'un
+  autre, 403 sur `/admin/users`).
 - `BibliothequeApplicationTests` : 1 test (contexte).
 
-**Frontend — 19 FAILED (identiques, préexistants), 67 SUCCESS, 86 total**
-(`ng test`, Chrome headless réel) : **+5 tests nouveaux, tous passants**,
-aucune régression sur les 62 déjà verts :
+**Frontend — 18 FAILED (préexistants), 71 SUCCESS, 89 total** (`ng test`,
+Chrome headless réel), aucune régression. Les 18 échecs sont les 19
+préexistants moins `LoginComponent should create`, réparé (TestBed
+complété) pour pouvoir y tester l'alerte de session. Tests ajoutés par cette
+branche, tous passants :
 - `reservation-form.component.spec.ts` (+3) : sélecteur "Adhérent" absent du
   DOM quand `afficherSelecteurAdherent=false` ; soumission possible avec
   seulement `livreId` ; corps émis sans `adherentId`.
 - `reservations.component.spec.ts` (+2, nouveau bloc `describe` rôle
   Adhérent) : `GET /admin/users` jamais appelé ; `estBibliothecaire` faux et
   `adherents` reste vide.
+- `auth.interceptor.spec.ts` (+1 net, le test du 401 étant remplacé par
+  deux) : session vidée et redirection vers `/login` avec le message du
+  serveur ; message de repli ; un 403 ne vide pas la session.
+- `login.component.spec.ts` (+2) : alerte affichée avec le message transmis ;
+  aucune alerte sans message.
 
 ## Scénario §6.3 — vérification navigateur réelle (preuve empirique RS-03/RS-05)
 
